@@ -50,5 +50,53 @@ void calcPower(RECIEVER *pRecvrs, const SENDER *pSenders, const unsigned int nSe
 
 /* Calculate distance with Pythagoras theorem */
 float distance_euclid(const RECIEVER *pRecvr,const SENDER *pSender){
-  return sqrt((pRecvr->x - pSender->x)*(pRecvr->x - pSender->x) + (pRecvr->y - pSender->y)*(pRecvr->y - pSender->y));
+  float dist = sqrt((pRecvr->x - pSender->x)*(pRecvr->x - pSender->x) + (pRecvr->y - pSender->y)*(pRecvr->y - pSender->y));
+  if(dist < 1.0){
+    dist = 1.0;
+  }
+  return dist;
+}
+
+/* Create recievers within given bounds maxW, maxH */
+void spawnRecievers(RECIEVER *pRecievers, const unsigned int nRecievers, const unsigned int maxW, const unsigned int maxH){
+  unsigned int i = 0;
+
+  if(!pRecievers || nRecievers == 0 || maxW == 0 || maxH == 0){
+    (void)puts("Error, can't spawn recievers.");
+    return;
+  }
+
+  for(i = 0; i < nRecievers; i++){
+    (pRecievers + i)->x = ((float)rand()/(float)RAND_MAX)*maxW;
+    (pRecievers + i)->y = ((float)rand()/(float)RAND_MAX)*maxH;
+  }
+}
+
+/* Create transmitters within given bounds maxW,maxH */
+void spawnTransmitters(SENDER *pSenders, RECIEVER *pRecievers, const unsigned int nSenders, const unsigned int nRecievers, const unsigned int maxW, const unsigned int maxH){
+  unsigned int i = 0, j = 0;
+  unsigned char *isTaken = NULL;
+
+  if(!pRecievers || !pSenders || nRecievers == 0 || nSenders == 0 || maxW == 0 || maxH == 0){
+    (void)puts("Error, can't spawn transmitters.");
+    return;
+  }
+
+  isTaken = calloc(nRecievers ,sizeof(unsigned char));
+
+  for(i = 0; i < nSenders; i++){
+    (pSenders + i)->x = ((float)rand()/(float)RAND_MAX)*maxW;
+    (pSenders + i)->y = ((float)rand()/(float)RAND_MAX)*maxH;
+    (pSenders + i)->power = 1.0;
+    do{
+      j = rand()%nRecievers;
+      if(*(isTaken + j) == 0){
+	*(isTaken + j) = 1;
+	(pSenders + i)->pRecepient = (pRecievers + j);
+	j = 1;
+      }else{
+        j = 0;
+      }
+    }while(j != 1);
+  }
 }

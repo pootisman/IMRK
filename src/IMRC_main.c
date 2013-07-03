@@ -4,6 +4,7 @@
 #include <math.h>
 #include "IMRC_models.h"
 #include "IMRC_types.h"
+#include "IMRC_aux.h"
 
 #ifdef DEBUG
 #include <mtrace.h>
@@ -31,42 +32,43 @@ int main(int argc, char *argv[]){
   while((opt = getopt(argc, argv, VALID_ARGS)) != -1){
     switch(opt){
       case('H'):{
-        if(argv[i+1] != NULL){
-          maxHeight = atoi(argv[i + 1]);
+        if(argv[i] != NULL){
+          maxHeight = atoi(argv[i]);
 	}
-	i++;
+	++i;
         break;
       }
       case('W'):{
-        if(argv[i + 1] != NULL){
-	  maxWidth = atoi(argv[i + 1]);
+        if(argv[i] != NULL){
+	  maxWidth = atoi(argv[i]);
 	}
-	i++;
+	++i;
 	break;
       }
       case('T'):{
-	if(argv[i + 1] != NULL){
-	  nThreads = atoi(argv[i + 1]);
+	if(argv[i] != NULL){
+	  nThreads = atoi(argv[i]);
 	}
-	i++;
+	++i;
 	break;
       }
       case('S'):{
-	if(argv[i + 1] != NULL){
-	  nSenders = atoi(argv[i + 1]);
+	if(argv[i] != NULL){
+	  nSenders = atoi(argv[i]);
+	}
+	++i;
+	break;
+      }
+      case('R'):{
+        if(argv[i] != NULL){
+	  nRecievers = atoi(argv[i]);
 	}
 	i++;
 	break;
       }
-      case('R'):{
-        if(argv[i + 1] != NULL){
-	  nRecievers = atoi(argv[i + 1]);
-	}
-	break;
-      }
       case('F'):{
-	if(argv[i + 1] != NULL){
-	  I = fopen(argv[i + 1], "r");
+	if(argv[i] != NULL){
+	  I = fopen(argv[i], "r");
 
 	  if(!I){
 	    (void)puts("Error, can't open file, terminating.");
@@ -76,11 +78,12 @@ int main(int argc, char *argv[]){
 	    return EXIT_FAILURE;
 	  }
 	}
+	++i;
 	break;
       }
       case('O'):{
-	if(argv[i + 1] != NULL){
-	  O = fopen( argv[i + 1],"w");
+	if(argv[i] != NULL){
+	  O = fopen( argv[i],"w");
 	  if(!O){
 	    (void)puts("Error, can't open file, terminating.");
 	    if(I){
@@ -89,6 +92,7 @@ int main(int argc, char *argv[]){
 	    return EXIT_FAILURE;
 	  }
 	}
+	++i;
 	break;
       }
       default:{
@@ -103,27 +107,22 @@ int main(int argc, char *argv[]){
   pRecList = calloc(nRecievers, sizeof(RECIEVER));
   pSendList = calloc(nSenders, sizeof(SENDER));
 
-  pRecList->x = 16;
-  pRecList->y = 16;
-  (pRecList + 1)->x = 0;
-  (pRecList + 1)->y = 0;
-
-  pSendList->x = 0;
-  pSendList->y = 0;
-  pSendList->power = 1;
-  pSendList->pRecepient = (pRecList);
-
-  (pSendList + 1)->x = 16;
-  (pSendList + 1)->y = 16;
-  (pSendList + 1)->power = 1;
-  (pSendList + 1)->pRecepient = (pRecList + 1);
+  spawnRecievers( pRecList, nRecievers, maxWidth, maxHeight);
+  spawnTransmitters( pSendList, pRecList, nSenders, nRecievers, maxWidth, maxHeight);
 
   calcPower(pRecList, pSendList, nSenders, nRecievers, 0);
 
-  (void)printf("LSNR for first Node: %f\nLSNR for second Node: %f\n", (pRecList)->SNRLin, (pRecList + 1)->SNRLin);
+  dumpToFile(pRecList, nRecievers, O);
 
   (void)free(pRecList);
   (void)free(pSendList);
+
+  if(O){
+    (void)fclose(O);
+  }
+  if(I){
+    (void)fclose(I);
+  }
 
   return EXIT_SUCCESS;
 }
