@@ -4,13 +4,14 @@
 #include <math.h>
 #include "IMRC_models.h"
 #include "IMRC_types.h"
+#include "IMRC_gl.h"
 #include "IMRC_aux.h"
 
 #ifdef DEBUG
 #include <mtrace.h>
 #endif
 
-#define VALID_ARGS "W:H:R:S:F:O:T:"
+#define VALID_ARGS "W:H:R:S:F:O:T:G"
 #define DEF_WIDTH 255
 #define DEF_HEIGHT 255
 #define DEF_THREADS 1
@@ -19,7 +20,7 @@
 
 int main(int argc, char *argv[]){
   unsigned int maxHeight = DEF_HEIGHT, maxWidth = DEF_WIDTH, nRecievers = DEF_RECIEVERS, nSenders = DEF_SENDERS, nThreads = DEF_THREADS, i = 2;
-  int opt = 0;
+  int opt = 0, useGL = 0, fileo = 0, filei = 0;
   FILE *I = NULL, *O = NULL;
   RECIEVER *pRecList = NULL;
   SENDER *pSendList = NULL;
@@ -31,6 +32,10 @@ int main(int argc, char *argv[]){
   /* Parse program arguments. */
   while((opt = getopt(argc, argv, VALID_ARGS)) != -1){
     switch(opt){
+      case('G'):{
+	useGL = 1;
+	break;
+      }
       case('H'):{
         if(argv[i] != NULL){
           maxHeight = atoi(argv[i]);
@@ -78,6 +83,7 @@ int main(int argc, char *argv[]){
 	    return EXIT_FAILURE;
 	  }
 	}
+	filei = 1;
 	++i;
 	break;
       }
@@ -92,6 +98,7 @@ int main(int argc, char *argv[]){
 	    return EXIT_FAILURE;
 	  }
 	}
+	fileo = 1;
 	++i;
 	break;
       }
@@ -103,6 +110,7 @@ int main(int argc, char *argv[]){
     ++i;
   }
 
+  initRand();
 
   pRecList = calloc(nRecievers, sizeof(RECIEVER));
   pSendList = calloc(nSenders, sizeof(SENDER));
@@ -112,15 +120,22 @@ int main(int argc, char *argv[]){
 
   calcPower(pRecList, pSendList, nSenders, nRecievers, 0);
 
+  if(fileo){
   dumpToFile(pRecList, nRecievers, O);
+  }
+
+  if(useGL){
+    initData(pRecList, pSendList, nSenders, nRecievers);
+    initGraphics(75, 1366, 768, &argc, argv, maxWidth, maxHeight);
+  }
 
   (void)free(pRecList);
   (void)free(pSendList);
 
-  if(O){
+  if(fileo){
     (void)fclose(O);
   }
-  if(I){
+  if(filei){
     (void)fclose(I);
   }
 

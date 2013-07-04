@@ -99,4 +99,7 @@ void spawnTransmitters(SENDER *pSenders, RECIEVER *pRecievers, const unsigned in
       }
     }while(j != 1);
   }
+
+  (void)free(isTaken);
+
 }
