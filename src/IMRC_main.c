@@ -8,10 +8,12 @@
 #include "IMRC_aux.h"
 
 #ifdef DEBUG
-#include <mtrace.h>
+#include <mcheck.h>
 #endif
 
-#define VALID_ARGS "W:H:R:S:F:O:T:G"
+#define HELP "Help for IMRC:\n===================================\n-W maximum x coordinates.\n-H maximum y coordinates.\n-R amount of recievers to spawn.\n-S amount of transmitters to spawn.\n-F file to read graph from.\n-O file for SNR output.\n-T number of threads to run.\n-G use graphics.\n-h This message\n===================================\nINFO FOR GRAPHICS MODE:\nRED - transmitter.\nYELLOW - reciever."
+
+#define VALID_ARGS "W:H:R:S:F:O:T:Gh"
 #define DEF_WIDTH 255
 #define DEF_HEIGHT 255
 #define DEF_THREADS 1
@@ -24,9 +26,9 @@ int main(int argc, char *argv[]){
   FILE *I = NULL, *O = NULL;
   RECIEVER *pRecList = NULL;
   SENDER *pSendList = NULL;
-
+  float *pA = NULL;
 #ifdef DEBUG
-  mcheck();
+  mtrace();
 #endif
 
   /* Parse program arguments. */
@@ -102,6 +104,10 @@ int main(int argc, char *argv[]){
 	++i;
 	break;
       }
+      case('h'):{
+        (void)puts(HELP);
+	return EXIT_SUCCESS;
+      }
       default:{
         (void)puts("Unknown argument.");
 	break;
@@ -112,26 +118,29 @@ int main(int argc, char *argv[]){
 
   initRand();
 
+  pA = prepareSilencing(maxWidth, maxHeight);
+
   pRecList = calloc(nRecievers, sizeof(RECIEVER));
   pSendList = calloc(nSenders, sizeof(SENDER));
 
   spawnRecievers( pRecList, nRecievers, maxWidth, maxHeight);
   spawnTransmitters( pSendList, pRecList, nSenders, nRecievers, maxWidth, maxHeight);
 
-  calcPower(pRecList, pSendList, nSenders, nRecievers, 0);
+  calcPower(pRecList, pSendList, nSenders, nRecievers, maxWidth);
 
   if(fileo){
-  dumpToFile(pRecList, nRecievers, O);
+    dumpToFile(pRecList, nRecievers, O);
+    (void)fflush(O);
   }
 
   if(useGL){
     initData(pRecList, pSendList, nSenders, nRecievers);
-    initGraphics(75, 1366, 768, &argc, argv, maxWidth, maxHeight);
+    initGraphics( &argc, argv, maxWidth, maxHeight);
   }
 
   (void)free(pRecList);
   (void)free(pSendList);
-
+  (void)free(pA);
   if(fileo){
     (void)fclose(O);
   }

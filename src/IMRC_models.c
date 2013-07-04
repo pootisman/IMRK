@@ -4,6 +4,9 @@
 #include "IMRC_models.h"
 #include "IMRC_types.h"
 
+float *A = NULL;
+unsigned int Asize = 0;
+
 /* Gaussian distribution generator, Box-Muller method */
 float genGauss(void){
   float U1 = 0.0f, U2 = 0.0f, V1 = 0.0f, V2 = 0.0f, S = 0.0f;
@@ -20,13 +23,30 @@ float genGauss(void){
   return sqrt(-1.0f * log(S) / S) * V1;
 }
 
+/* Unreal mode */
+float *prepareSilencing(unsigned int W, unsigned int H){
+  unsigned int i = 0, j = 0;
+
+  A = calloc(W*H, sizeof(float));
+
+  Asize = W*H;
+
+  for(j = 0; j < H; j++){
+    for(i = 0; i < W; i++){
+      *(A + i + j*W) = genGauss()*6.0;
+    }
+  }
+
+  return A;
+}
+
 /* Standart model power calculation. */
 float power_simple(RECIEVER *pRecvr, const SENDER *pSender, const float amp){
-  return ((pRecvr == pSender->pRecepient) ? (1) : (-1)) * pSender->power * (100.0)/(distance_euclid(pRecvr, pSender)*distance_euclid(pRecvr, pSender)*distance_euclid(pRecvr, pSender)*distance_euclid(pRecvr, pSender)*distance_euclid(pRecvr, pSender)) + genGauss()*amp;
+  return ((pRecvr == pSender->pRecepient) ? (1) : (-1)) * pSender->power * (100.0)/(distance_euclid(pRecvr, pSender)*distance_euclid(pRecvr, pSender)*distance_euclid(pRecvr, pSender)*distance_euclid(pRecvr, pSender)*distance_euclid(pRecvr, pSender) + genGauss()*amp);
 }
 
 /* Calculate total power applied to every reciever */
-void calcPower(RECIEVER *pRecvrs, const SENDER *pSenders, const unsigned int nSends, const unsigned int nRecvs, const float amp){
+void calcPower(RECIEVER *pRecvrs, const SENDER *pSenders, const unsigned int nSends, const unsigned int nRecvs, unsigned int W){
   unsigned int i = 0, j = 0;
   float buffer = 0.0;
 
@@ -37,7 +57,7 @@ void calcPower(RECIEVER *pRecvrs, const SENDER *pSenders, const unsigned int nSe
 
   for(j = 0; j < nRecvs; j++){
     for(i = 0; i < nSends; i++){
-      buffer = power_simple((pRecvrs + j), (pSenders + i), amp);
+      buffer = power_simple((pRecvrs + j), (pSenders + i), *(A + (unsigned int)((pRecvrs + j)->x) + (unsigned int)(W*(pRecvrs + j)->y)));
       if(buffer > 0.0){
         (pRecvrs + j)->signal += buffer;
       }else{
@@ -101,5 +121,4 @@ void spawnTransmitters(SENDER *pSenders, RECIEVER *pRecievers, const unsigned in
   }
 
   (void)free(isTaken);
-
 }
