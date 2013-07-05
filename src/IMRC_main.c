@@ -16,13 +16,13 @@
 #define VALID_ARGS "W:H:R:S:F:O:T:Gh"
 #define DEF_WIDTH 255
 #define DEF_HEIGHT 255
-#define DEF_THREADS 1
+#define DEF_THREADS 0
 #define DEF_SENDERS 2
 #define DEF_RECIEVERS 2
 
 int main(int argc, char *argv[]){
-  unsigned int maxHeight = DEF_HEIGHT, maxWidth = DEF_WIDTH, nRecievers = DEF_RECIEVERS, nSenders = DEF_SENDERS, nThreads = DEF_THREADS, i = 2;
-  int opt = 0, useGL = 0, fileo = 0, filei = 0;
+  unsigned int maxHeight = DEF_HEIGHT, maxWidth = DEF_WIDTH, nRecievers = DEF_RECIEVERS, nSenders = DEF_SENDERS, i = 2;
+  int opt = 0, useGL = 0, fileo = 0, filei = 0, nThreads = DEF_THREADS;
   FILE *I = NULL, *O = NULL;
   RECIEVER *pRecList = NULL;
   SENDER *pSendList = NULL;
@@ -126,7 +126,7 @@ int main(int argc, char *argv[]){
   spawnRecievers( pRecList, nRecievers, maxWidth, maxHeight);
   spawnTransmitters( pSendList, pRecList, nSenders, nRecievers, maxWidth, maxHeight);
 
-  calcPower(pRecList, pSendList, nSenders, nRecievers, maxWidth);
+  calcPower(pRecList, pSendList, nSenders, nRecievers, maxWidth, nThreads);
 
   if(fileo){
     dumpToFile(pRecList, nRecievers, O);
