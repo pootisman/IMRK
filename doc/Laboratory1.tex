@@ -1,0 +1,58 @@
+\documentclass[a4paper, titlepage, 10pt]{article}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english, russian]{babel}
+\usepackage{indentfirst}
+\usepackage{tabularx}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{float}
+\hoffset=-2.1cm
+\voffset=-1.6cm
+\setlength{\parindent}{1cm}
+\textwidth= 16cm
+\textheight = 24cm
+\newcommand{\HRule}{\rule{\linewidth}{0.5mm}}
+\newcommand{\textunderscript}[1]{$_{\text{#1}}$}
+\begin{document}
+\tableofcontents
+\newpage
+\section{Техническое задание.}
+\indent Реализовать программу, производящую имитационое моделирование передачи сигнлов в ридиоканале с множеством приёмников и передатчиков. Вторичной задачей является уменьшение времени работы программы.
+\appendix
+\section{Описание модели канала.}
+При написании программы использовалась модель со следующими праметрами:
+\begin{enumerate}
+  \item{Зависимость мощности сигнала от расстоянии расчитывается по следующему уравнению:\\
+  \begin{center}
+    $
+    L = \frac{100*P}{d^5 + a}
+    $
+  \end{center}
+  где P - Мощность передатчика.\\
+  d - Расстояние между передатчиком и приёмником.\\
+  a - Зачение силы затухания в точке нахождения приёмника.\\
+  }
+  \item{Значения переменной а в разных точках определяется матрицей случайных гауссовских величин, корреллированных в пространстве.}
+\end{enumerate}
+\begin{figure}[h!]
+ \begin{center}
+  \includegraphics[width=0.7\textwidth]{slow_fading_1.jpg}
+  \caption{Отображение примера матрицы значений a в тонах серого.}
+ \end{center}
+\end{figure}
+\addcontentsline{toc}{figure}{Отображение примера матрицы значений a в тонах серого.}
+
+\section{Описание работы программы.}
+\indent На вход программе подаются параметры моделирования, такие как:
+\begin{enumerate}
+ \item{Колчество приёмников и передатчиков.}
+ \item{Размер решётки для моделирования, высота/ширина.}
+ \item{Использование графического вывода.}
+ \item{Использование вывода в файл с указанием названия файла.}
+ \item{Ввод из файла приёмников и передатчиков.}
+ \item{Запрос краткой справки.}
+\end{enumerate}
+\indent Генерирование координат источников и передатчиков происходит по равномерному закону распределения. 
+\section*{Выводы по проделанной работе.}
+\end{document}
