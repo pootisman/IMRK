@@ -11,17 +11,18 @@
 #include <mcheck.h>
 #endif
 
-#define HELP "Help for IMRC:\n===================================\n-W maximum x coordinates.\n-H maximum y coordinates.\n-R amount of recievers to spawn.\n-S amount of transmitters to spawn.\n-F file to read graph from.\n-O file for SNR output.\n-T number of threads to run.\n-G use graphics.\n-h This message\n===================================\nINFO FOR GRAPHICS MODE:\nRED - transmitter.\nYELLOW - reciever."
+#define HELP "Help for IMRC:\n===================================\n-W maximum x coordinates.\n-H maximum y coordinates.\n-R amount of recievers to spawn.\n-S amount of transmitters to spawn.\n-F file to read graph from.\n-O file for SNR output.\n-T number of threads to run.\n-G use graphics.\n-M model selection\n-h This message\n===================================\nINFO FOR GRAPHICS MODE:\nRED - transmitter.\nYELLOW - reciever."
 
-#define VALID_ARGS "W:H:R:S:F:O:T:Gh"
+#define VALID_ARGS "W:H:R:S:F:O:T:GM:h"
 #define DEF_WIDTH 255
 #define DEF_HEIGHT 255
 #define DEF_THREADS 0
 #define DEF_SENDERS 2
 #define DEF_RECIEVERS 2
+#define DEF_MODEL 1
 
 int main(int argc, char *argv[]){
-  unsigned int maxHeight = DEF_HEIGHT, maxWidth = DEF_WIDTH, nRecievers = DEF_RECIEVERS, nSenders = DEF_SENDERS, i = 2;
+  unsigned int maxHeight = DEF_HEIGHT, maxWidth = DEF_WIDTH, nRecievers = DEF_RECIEVERS, nSenders = DEF_SENDERS, i = 2, model = DEF_MODEL;
   int opt = 0, useGL = 0, fileo = 0, filei = 0, nThreads = DEF_THREADS;
   FILE *I = NULL, *O = NULL;
   RECIEVER *pRecList = NULL;
@@ -70,7 +71,14 @@ int main(int argc, char *argv[]){
         if(argv[i] != NULL){
 	  nRecievers = atoi(argv[i]);
 	}
-	i++;
+	++i;
+	break;
+      }
+      case('M'):{
+        if(argv[i] != NULL){
+	  model = atoi(argv[i]);
+	}
+	++i;
 	break;
       }
       case('F'):{
@@ -126,7 +134,7 @@ int main(int argc, char *argv[]){
   spawnRecievers( pRecList, nRecievers, maxWidth, maxHeight);
   spawnTransmitters( pSendList, pRecList, nSenders, nRecievers, maxWidth, maxHeight);
 
-  calcPower(pRecList, pSendList, nSenders, nRecievers, maxWidth, nThreads);
+  calcPower(pRecList, pSendList, nSenders, nRecievers, maxWidth, nThreads, model);
 
   if(fileo){
     dumpToFile(pRecList, nRecievers, O);
@@ -137,6 +145,8 @@ int main(int argc, char *argv[]){
     initData(pRecList, pSendList, nSenders, nRecievers);
     initGraphics( &argc, argv, maxWidth, maxHeight);
   }
+
+  stopModel();
 
   (void)free(pRecList);
   (void)free(pSendList);

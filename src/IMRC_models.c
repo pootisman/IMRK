@@ -6,19 +6,90 @@
 #include "IMRC_models.h"
 #include "IMRC_types.h"
 
-float *A = NULL;
-unsigned int Asize = 0;
+#define M_PI 3.14159265358979323846264338327
+
+float *gA = NULL;
+unsigned int gAsize = 0, gnSenders = 0;
+SENDER *gpSenders = NULL;
 
 typedef struct{
   unsigned int nSenders;
   unsigned int startIndex;
   unsigned int stopIndex;
   unsigned int W;
+  unsigned int model;
   RECIEVER *pRecvrs;
   const SENDER *pSenders;
 }THREAD_PARAMS;
 
 #ifndef DEBUG
+/* Check whether we transmit data to the pReciever or not */
+inline char isUseful(const RECIEVER *pReciever, const SENDER *pSender){
+  unsigned int i = 0;
+  RECIEVERS_LLIST *temp = NULL;
+
+  if(!pReciever || !pSender){
+    (void)puts("Error, recieved NULL in isUseful.");
+    return -1;
+  }
+
+  temp = pSender->pRecepients;
+
+  if(temp != NULL){
+    for(i = 0; i < pSender->nRecepients && temp != NULL; i++){
+      if(temp->pTarget == pReciever){
+        return 1;
+      }
+      if(temp != NULL){
+        temp = temp->pNext;
+      }
+    }
+  }
+
+  return 0;
+}
+
+/* Bind reciever to the transmitter */
+inline void bindReciever(RECIEVER *pReciever,SENDER *pSender){
+  RECIEVERS_LLIST *temp = NULL;
+
+  if(!pReciever || !pSender){
+    (void)puts("Error, can't bind with NULL.");
+    return;
+  }
+
+  temp = pSender->pRecepients;
+
+  if(temp != NULL){
+    while(temp->pNext != NULL){
+      temp = temp->pNext;
+    }
+    temp->pNext = calloc(1, sizeof(RECIEVERS_LLIST));
+    (temp->pNext->pTarget) = pReciever;
+    pSender->nRecepients++;
+  }else{
+    pSender->pRecepients = calloc(1, sizeof(RECIEVERS_LLIST));
+    pSender->pRecepients->pTarget = pReciever;
+    pSender->nRecepients = 1;
+  }
+}
+
+/* Gaussian distribution generator, Box-Muller method */
+inline float genGauss(void){
+  float U1 = 0.0f, U2 = 0.0f, V1 = 0.0f, V2 = 0.0f, S = 0.0f;
+
+  do{
+    U1= fabs((float)rand()/(float)RAND_MAX);            /* U1=[0    ,1] */
+    U2= fabs((float)rand()/(float)RAND_MAX);            /* U2=[0    ,1] */
+    V1= 2.0f * U1 - 1.0f;            /* V1=[-1,1] */
+    V2= 2.0f * U2 - 1.0f;           /* V2=[-1,1] */
+    S = V1 * V1 + V2 * V2;
+  }
+  while(S >= 1.0f);
+  
+  return sqrt(-1.0f * log(S) / S) * V1;
+}
+
 /* Calculate distance with Pythagoras theorem */
 inline float distance_euclid(const RECIEVER *pRecvr,const SENDER *pSender){
   float dist = sqrt((pRecvr->x - pSender->x)*(pRecvr->x - pSender->x) + (pRecvr->y - pSender->y)*(pRecvr->y - pSender->y));
@@ -27,41 +98,68 @@ inline float distance_euclid(const RECIEVER *pRecvr,const SENDER *pSender){
   }
   return dist;
 }
-#else
-/* Calculate distance with Pythagoras theorem */
-float distance_euclid(const RECIEVER *pRecvr,const SENDER *pSender){
-  float dist = sqrt((pRecvr->x - pSender->x)*(pRecvr->x - pSender->x) + (pRecvr->y - pSender->y)*(pRecvr->y - pSender->y));
-  if(dist < 1.0){
-    dist = 1.0;
-  }
-  return dist;
+
+/* Standart model power calculation. */
+inline float power_simple(RECIEVER *pRecvr, const SENDER *pSender, const float amp){
+  return ((isUseful(pRecvr, pSender)) ? (1) : (-1)) * pSender->power * (100.0)/(distance_euclid(pRecvr, pSender)*distance_euclid(pRecvr, pSender)*distance_euclid(pRecvr, pSender)*distance_euclid(pRecvr, pSender)*distance_euclid(pRecvr, pSender) + amp);
 }
-#endif
 
-/* Function for threaded calculations */
-void *threadPowerCalc(void *args){
-  THREAD_PARAMS *task = (THREAD_PARAMS *)args;
-  unsigned int i = 0, j = 0;
-  float buffer = 0.0;
+/* Slightly more realistic model power calculation */
+inline float power_complex(RECIEVER *pRecvr, const SENDER *pSender, const float amp, const float Ht, const float Hr, const float freq){
+  return (distance_euclid(pRecvr, pSender) == 0) ? (0) : (isUseful(pRecvr, pSender) ? (1) : (-1))*(20.0*log10(4.0*M_PI/(3e8/freq)) - 2.0 * Hr + 40.0*log10(distance_euclid(pRecvr, pSender)));
+}
 
-  if(!task){
-    (void)puts("Error, NULL passed to thread.");
-    (void)pthread_exit(NULL);
+#else
+
+/* Check whether we transmit data to the pReciever or not */
+char isUseful(const RECIEVER *pReciever, const SENDER *pSender){
+  unsigned int i = 0;
+  RECIEVERS_LLIST *temp = NULL;
+
+  if(!pReciever || !pSender){
+    (void)puts("Error, recieved NULL in isUseful.");
+    return -1;
   }
 
-  for(i = task->startIndex; i < task->stopIndex; i++){
-    for(j = 0; j < task->nSenders; j++){
-      buffer = power_simple((task->pRecvrs + i), (task->pSenders + j), *(A + (unsigned int)((task->pRecvrs + i)->x) + (unsigned int)(task->W*(task->pRecvrs + i)->y)));
-      if(buffer > 0.0){
-        (task->pRecvrs + i)->signal += buffer;
-      }else{
-	(task->pRecvrs + i)->waste -= buffer;
+  temp = pSender->pRecepients;
+
+  if(temp != NULL){
+    for(i = 0; i < pSender->nRecepients && temp != NULL; i++){
+      if(temp->pTarget == pReciever){
+        return 1;
+      }
+      if(temp != NULL){
+        temp = temp->pNext;
       }
     }
-    (task->pRecvrs + i)->SNRLin = (task->pRecvrs + i)->signal/(task->pRecvrs + i)->waste;
   }
 
-  (void)pthread_exit(NULL);
+  return 0;
+}
+
+/* Bind reciever to the transmitter */
+void bindReciever(RECIEVER *pReciever, SENDER *pSender){
+  RECIEVERS_LLIST *temp = NULL;
+
+  if(!pReciever || !pSender){
+    (void)puts("Error, can't bind with NULL.");
+    return;
+  }
+
+  temp = pSender->pRecepients;
+
+  if(temp != NULL){
+    while(temp->pNext != NULL){
+      temp = temp->pNext;
+    }
+    temp->pNext = calloc(1, sizeof(RECIEVERS_LLIST));
+    temp->pNext->pTarget = pReciever;
+    (pSender->nRecepients)++;
+  }else{
+    pSender->pRecepients = calloc(1, sizeof(RECIEVERS_LLIST));
+    pSender->pRecepients->pTarget = pReciever;
+    (pSender->nRecepients) = 1;
+  }
 }
 
 /* Gaussian distribution generator, Box-Muller method */
@@ -80,30 +178,84 @@ float genGauss(void){
   return sqrt(-1.0f * log(S) / S) * V1;
 }
 
-/* Unreal mode */
-float *prepareSilencing(unsigned int W, unsigned int H){
-  unsigned int i = 0, j = 0;
-
-  A = calloc(W*H, sizeof(float));
-
-  Asize = W*H;
-
-  for(j = 0; j < H; j++){
-    for(i = 0; i < W; i++){
-      *(A + i + j*W) = genGauss()*6.0;
-    }
+/* Calculate distance with Pythagoras theorem */
+float distance_euclid(const RECIEVER *pRecvr,const SENDER *pSender){
+  float dist = sqrt((pRecvr->x - pSender->x)*(pRecvr->x - pSender->x) + (pRecvr->y - pSender->y)*(pRecvr->y - pSender->y));
+  if(dist < 1.0){
+    dist = 1.0;
   }
-
-  return A;
+  return dist;
 }
 
 /* Standart model power calculation. */
 float power_simple(RECIEVER *pRecvr, const SENDER *pSender, const float amp){
-  return ((pRecvr == pSender->pRecepient) ? (1) : (-1)) * pSender->power * (100.0)/(distance_euclid(pRecvr, pSender)*distance_euclid(pRecvr, pSender)*distance_euclid(pRecvr, pSender)*distance_euclid(pRecvr, pSender)*distance_euclid(pRecvr, pSender) + genGauss()*amp);
+  return ((isUseful(pRecvr, pSender)) ? (1) : (-1)) * pSender->power * (100.0)/(distance_euclid(pRecvr, pSender)*distance_euclid(pRecvr, pSender)*distance_euclid(pRecvr, pSender)*distance_euclid(pRecvr, pSender)*distance_euclid(pRecvr, pSender) + amp);
+}
+
+/* Slightly more realistic model power calculation */
+float power_complex(RECIEVER *pRecvr, const SENDER *pSender, const float amp, const float Ht, const float Hr, const float freq){
+  return (distance_euclid(pRecvr, pSender) == 0) ? (0) : (isUseful(pRecvr, pSender) ? (1) : (-1))*(20.0*log10(4.0*M_PI/(3e8/freq)) - 2.0 * Hr + 40.0*log10(distance_euclid(pRecvr, pSender)));
+}
+#endif
+
+/* Function for threaded calculations */
+void *threadPowerCalc(void *args){
+  THREAD_PARAMS *task = (THREAD_PARAMS *)args;
+  unsigned int i = 0, j = 0;
+  float buffer = 0.0;
+
+  if(!task){
+    (void)puts("Error, NULL passed to thread.");
+    (void)pthread_exit(NULL);
+  }
+
+  for(i = task->startIndex; i < task->stopIndex; i++){
+    for(j = 0; j < task->nSenders; j++){
+      switch(task->model){
+        case(1):{
+          buffer = power_simple((task->pRecvrs + i), (task->pSenders + j), *(gA + (unsigned int)floor((task->pRecvrs + i)->x) + (unsigned int)(task->W*floor((task->pRecvrs + i)->y))));
+          break;
+	}
+	case(2):{
+	  buffer = power_complex((task->pRecvrs + i), (task->pSenders + j), *(gA + (unsigned int)floor((task->pRecvrs + i)->x) + (unsigned int)(task->W*floor((task->pRecvrs + i)->y))), 1.5, 1.5, 2.4e9);
+	  break;
+	}
+	default:{
+	  (void)puts("Error, mode not suppoted.");
+	  pthread_exit(NULL); 
+	}
+      }
+      if(buffer > 0.0){
+        (task->pRecvrs + i)->signal += buffer;
+      }else{
+	(task->pRecvrs + i)->waste -= buffer;
+      }
+    }
+    (task->pRecvrs + i)->SNRLin = (task->pRecvrs + i)->signal/(task->pRecvrs + i)->waste;
+  }
+
+  (void)pthread_exit(NULL);
+}
+
+/* Unreal mode */
+float *prepareSilencing(unsigned int W, unsigned int H){
+  unsigned int i = 0, j = 0;
+
+  gA = calloc(W*H, sizeof(float));
+
+  gAsize = W*H;
+
+  for(j = 0; j < H; j++){
+    for(i = 0; i < W; i++){
+      *(gA + i + j*W) = genGauss()*6.0;
+    }
+  }
+
+  return gA;
 }
 
 /* Calculate total power applied to every reciever */
-void calcPower(RECIEVER *pRecvrs, const SENDER *pSenders, const unsigned int nSends, const unsigned int nRecvs, unsigned int W, int Threads){
+void calcPower(RECIEVER *pRecvrs, const SENDER *pSenders, const unsigned int nSends, const unsigned int nRecvs, unsigned int W, int Threads, unsigned int model){
   unsigned int i = 0, j = 0;
   long int nThreads = 0;
   float buffer = 0.0;
@@ -129,7 +281,20 @@ void calcPower(RECIEVER *pRecvrs, const SENDER *pSenders, const unsigned int nSe
   if(nThreads <= 0){
     for(j = 0; j < nRecvs; j++){
       for(i = 0; i < nSends; i++){
-        buffer = power_simple((pRecvrs + j), (pSenders + i), *(A + (unsigned int)((pRecvrs + j)->x) + (unsigned int)(W*(pRecvrs + j)->y)));
+        switch(model){
+          case(1):{
+            buffer = power_simple(pRecvrs + j, pSenders + i, *(gA + (unsigned int)floor((pRecvrs + j)->x) + (unsigned int)(W*floor((pRecvrs + j)->y))));
+            break;
+	  }
+	  case(2):{
+	    buffer = power_complex(pRecvrs, pSenders, *(gA + (unsigned int)floor((pRecvrs + j)->x) + (unsigned int)(W*floor((pRecvrs + j)->y))), 1.5, 1.5, 2.4e9);
+	    break;
+	  }
+	  default:{
+	    (void)puts("Error, mode not suppoted.");
+  	    return;
+  	  }
+        }
         if(buffer > 0.0){
           (pRecvrs + j)->signal += buffer;
         }else{
@@ -150,6 +315,7 @@ void calcPower(RECIEVER *pRecvrs, const SENDER *pSenders, const unsigned int nSe
       (pTParams + i)->pSenders = pSenders;
       (pTParams + i)->pRecvrs = pRecvrs;
       (pTParams + i)->nSenders = nSends;
+      (pTParams + i)->model = model;
       (pTParams + i)->W = W;
     }
     /* Start threads, except for the last one, we are the last thread */
@@ -162,8 +328,21 @@ void calcPower(RECIEVER *pRecvrs, const SENDER *pSenders, const unsigned int nSe
     /* Start calculating our part */
     for(j = (pTParams + nThreads - 1)->startIndex; j < (pTParams + nThreads - 1)->stopIndex; j++){
       for(i = 0; i < nSends; i++){
-        buffer = power_simple(((pTParams + nThreads - 1)->pRecvrs + j), ((pTParams + nThreads -1)->pSenders + i), *(A + (unsigned int)(((pTParams + nThreads - 1)->pRecvrs + j)->x) + (unsigned int)(W*((pTParams + nThreads - 1)->pRecvrs + j)->y)));
-        if(buffer > 0.0){
+        switch(model){
+          case(1):{
+            buffer = power_simple(((pTParams + nThreads -1)->pRecvrs + j), ((pTParams + nThreads - 1)->pSenders + i), *(gA + (unsigned int)floor(((pTParams + nThreads - 1)->pRecvrs + j)->x) + (unsigned int)(W*floor(((pTParams + nThreads - 1)->pRecvrs + j)->y))));
+            break;
+	  }
+	  case(2):{
+	    buffer = power_complex(((pTParams + nThreads - 1)->pRecvrs + j), ((pTParams + nThreads - 1)->pSenders + i), *(gA + (unsigned int)floor(((pTParams + nThreads - 1)->pRecvrs + j)->x) + (unsigned int)(W*floor(((pTParams + nThreads - 1)->pRecvrs + j)->y))), 1.5, 1.5, 2.4e9);
+	    break;
+	  }
+	  default:{
+	    (void)puts("Error, mode not suppoted.");
+  	    return;
+  	  }
+        }
+	if(buffer > 0.0){
           ((pTParams + nThreads - 1)->pRecvrs + j)->signal += buffer;
         }else{
 	  ((pTParams + nThreads - 1)->pRecvrs + j)->waste -= buffer;
@@ -198,33 +377,45 @@ void spawnRecievers(RECIEVER *pRecievers, const unsigned int nRecievers, const u
   }
 }
 
-/* Create transmitters within given bounds maxW,maxH */
+/* Create transmitters within given bounds maxW,maxH and bind recievers to them */
 void spawnTransmitters(SENDER *pSenders, RECIEVER *pRecievers, const unsigned int nSenders, const unsigned int nRecievers, const unsigned int maxW, const unsigned int maxH){
   unsigned int i = 0, j = 0;
-  unsigned char *isTaken = NULL;
 
   if(!pRecievers || !pSenders || nRecievers == 0 || nSenders == 0 || maxW == 0 || maxH == 0){
     (void)puts("Error, can't spawn transmitters.");
     return;
   }
 
-  isTaken = calloc(nRecievers ,sizeof(unsigned char));
-
   for(i = 0; i < nSenders; i++){
     (pSenders + i)->x = ((float)rand()/(float)RAND_MAX)*maxW;
     (pSenders + i)->y = ((float)rand()/(float)RAND_MAX)*maxH;
     (pSenders + i)->power = 1.0;
-    do{
-      j = rand()%nRecievers;
-      if(*(isTaken + j) == 0){
-	*(isTaken + j) = 1;
-	(pSenders + i)->pRecepient = (pRecievers + j);
-	j = 1;
-      }else{
-        j = 0;
-      }
-    }while(j != 1);
   }
 
-  (void)free(isTaken);
+  for(i = 0; i < nRecievers; i++){
+    j = rand()%nSenders;
+    bindReciever(pRecievers + i, pSenders + j);
+  }
+
+  gpSenders = pSenders;
+  gnSenders = nSenders;
+}
+
+void stopModel(void){
+  unsigned int i = 0, j = 0;
+  RECIEVERS_LLIST *temp = NULL, *temp2 = NULL;
+
+  if(!gA && !gpSenders){
+    (void)puts("Error, failed to stop model, not running.");
+    return;
+  }
+
+  for(i = 0; i < gnSenders; i++){
+    temp = (gpSenders + i)->pRecepients;
+    for(j = 0; j < (gpSenders + i)->nRecepients && temp != NULL; j++){
+      temp2 = temp->pNext;
+      (void)free(temp);
+      temp = temp2;
+    }
+  }
 }

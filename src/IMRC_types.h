@@ -6,13 +6,18 @@ typedef struct{
   float signal; /* Total power of useful signal */
   float waste; /* Total power of bad signals */
   float SNRLin; /* SNR in linear scale */
-  unsigned int nTrans; /* Number of useful transmitters */
 }RECIEVER;
+
+typedef struct RECIEVERS_LLIST{
+  struct RECIEVERS_LLIST *pNext; /* Linked list of the recievers */
+  RECIEVER *pTarget; /* The reciever that will be connected to us */
+}RECIEVERS_LLIST;
 
 typedef struct{
   float x, y; /* Position */
   float power; /* Strength of the transmitter */
-  RECIEVER *pRecepient; /* The guy who will recieve data from us */
+  RECIEVERS_LLIST *pRecepients; /* Guys who will recieve data from us */
+  unsigned int nRecepients;/* Number of recepients for this node */
 }SENDER;
 
 #endif
