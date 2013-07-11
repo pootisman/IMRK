@@ -255,7 +255,7 @@ float *prepareSilencing(unsigned int W, unsigned int H){
 }
 
 /* Calculate total power applied to every reciever */
-void calcPower(RECIEVER *pRecvrs, const SENDER *pSenders, const unsigned int nSends, const unsigned int nRecvs, unsigned int W, int Threads, unsigned int model){
+void calcPower(RECIEVER *pRecvrs, SENDER *pSenders, const unsigned int nSends, const unsigned int nRecvs, unsigned int W, int Threads, unsigned int model){
   unsigned int i = 0, j = 0;
   long int nThreads = 0;
   float buffer = 0.0;
@@ -278,6 +278,9 @@ void calcPower(RECIEVER *pRecvrs, const SENDER *pSenders, const unsigned int nSe
     (void)puts("No multi-threading will be used.");
   }
 
+  gpSenders = pSenders;
+  gnSenders = nSends;
+
   if(nThreads <= 0){
     for(j = 0; j < nRecvs; j++){
       for(i = 0; i < nSends; i++){
@@ -287,7 +290,7 @@ void calcPower(RECIEVER *pRecvrs, const SENDER *pSenders, const unsigned int nSe
             break;
 	  }
 	  case(2):{
-	    buffer = power_complex(pRecvrs, pSenders, *(gA + (unsigned int)floor((pRecvrs + j)->x) + (unsigned int)(W*floor((pRecvrs + j)->y))), 1.5, 1.5, 2.4e9);
+	    buffer = power_complex(pRecvrs + j, pSenders + i, *(gA + (unsigned int)floor((pRecvrs + j)->x) + (unsigned int)(W*floor((pRecvrs + j)->y))), 1.5, 1.5, 2.4e9);
 	    break;
 	  }
 	  default:{
@@ -397,8 +400,6 @@ void spawnTransmitters(SENDER *pSenders, RECIEVER *pRecievers, const unsigned in
     bindReciever(pRecievers + i, pSenders + j);
   }
 
-  gpSenders = pSenders;
-  gnSenders = nSenders;
 }
 
 void stopModel(void){

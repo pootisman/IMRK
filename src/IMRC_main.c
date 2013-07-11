@@ -128,11 +128,14 @@ int main(int argc, char *argv[]){
 
   pA = prepareSilencing(maxWidth, maxHeight);
 
-  pRecList = calloc(nRecievers, sizeof(RECIEVER));
-  pSendList = calloc(nSenders, sizeof(SENDER));
-
-  spawnRecievers( pRecList, nRecievers, maxWidth, maxHeight);
-  spawnTransmitters( pSendList, pRecList, nSenders, nRecievers, maxWidth, maxHeight);
+  if(!filei){
+    pRecList = calloc(nRecievers, sizeof(RECIEVER));
+    pSendList = calloc(nSenders, sizeof(SENDER));
+    spawnRecievers( pRecList, nRecievers, maxWidth, maxHeight);
+    spawnTransmitters( pSendList, pRecList, nSenders, nRecievers, maxWidth, maxHeight);
+  }else{
+    readFromFile(&pRecList, &pSendList, &nRecievers, &nSenders, I);
+  }
 
   calcPower(pRecList, pSendList, nSenders, nRecievers, maxWidth, nThreads, model);
 
