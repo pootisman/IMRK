@@ -1,6 +1,6 @@
 #!/bin/zsh 
 
-LIMIT=50000
+LIMIT=15000
 SENDERS=5;
 TIMET=0.0;
 TIMEN=0.0;
