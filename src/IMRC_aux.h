@@ -2,8 +2,16 @@
 #define _IMRC_AUX_
 
 #include "IMRC_types.h"
-void readFromFile(RECIEVER **pRecievers, SENDER **pSenders, unsigned int *nRecievers, unsigned int *nSenders, FILE *input);
-void dumpToFile( const RECIEVER *pRecievers, const unsigned int nRecievers, const FILE *output);
+void readFromFile(FILE *input);
+void dumpToFile(const FILE *output);
 void initRand(void);
-
+RECIEVER *makeRcvrList(unsigned int nRecievers);
+SENDER *makeSndrList(unsigned int nSenders);
+void freeLists(void);
+void addReciever(SENDER *pSender, RECIEVER *pRecievers, unsigned int x, unsigned int y);
+RECIEVER *rcvrAtIndex( unsigned int index);
+SENDER *sndrAtIndex( unsigned int index);
+void rmReciever(RECIEVER *pReciever);
+void bindToReciever(RECIEVER *pReciever, SENDER *pSender);
+void unbindReciever(RECIEVER *pReciever);
 #endif

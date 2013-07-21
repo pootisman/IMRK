@@ -25,9 +25,6 @@ int main(int argc, char *argv[]){
   unsigned int maxHeight = DEF_HEIGHT, maxWidth = DEF_WIDTH, nRecievers = DEF_RECIEVERS, nSenders = DEF_SENDERS, i = 2, model = DEF_MODEL;
   int opt = 0, useGL = 0, fileo = 0, filei = 0, nThreads = DEF_THREADS;
   FILE *I = NULL, *O = NULL;
-  RECIEVER *pRecList = NULL;
-  SENDER *pSendList = NULL;
-  float *pA = NULL;
 #ifdef DEBUG
   mtrace();
 #endif
@@ -126,34 +123,30 @@ int main(int argc, char *argv[]){
 
   initRand();
 
-  pA = prepareSilencing(maxWidth, maxHeight);
+  prepareSilencing(maxWidth, maxHeight);
 
   if(!filei){
-    pRecList = calloc(nRecievers, sizeof(RECIEVER));
-    pSendList = calloc(nSenders, sizeof(SENDER));
-    spawnRecievers( pRecList, nRecievers, maxWidth, maxHeight);
-    spawnTransmitters( pSendList, pRecList, nSenders, nRecievers, maxWidth, maxHeight);
+    makeRcvrList(nRecievers);
+    makeSndrList(nSenders);
+    spawnRecievers(maxWidth, maxHeight);
+    spawnTransmitters(maxWidth, maxHeight);
   }else{
-    readFromFile(&pRecList, &pSendList, &nRecievers, &nSenders, I);
+    readFromFile(I);
   }
 
-  calcPower(pRecList, pSendList, nSenders, nRecievers, maxWidth, nThreads, model);
+  calcPower(maxWidth, nThreads, model);
 
   if(fileo){
-    dumpToFile(pRecList, nRecievers, O);
+    dumpToFile(O);
     (void)fflush(O);
   }
 
   if(useGL){
-    initData(pRecList, pSendList, nSenders, nRecievers);
     initGraphics( &argc, argv, maxWidth, maxHeight);
   }
 
   stopModel();
 
-  (void)free(pRecList);
-  (void)free(pSendList);
-  (void)free(pA);
   if(fileo){
     (void)fclose(O);
   }

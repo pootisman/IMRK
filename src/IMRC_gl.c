@@ -3,24 +3,8 @@
 #include <string.h>
 #include <GL/gl.h>
 #include <GL/freeglut.h>
-#include "IMRC_types.h"
 #include "IMRC_gl.h"
-
-#define LIN 1
-#define PNT 2
-#define END 0
-
-float percentX = 0.0, percentY = 0.0;
-unsigned int nRecievers = 0, nSenders = 0;
-unsigned char lineWidth = 1, spotSize = 2;
-RECIEVER *pRecievers = NULL;
-SENDER *pSenders = NULL;
-
-/* Struct to store data how to display numbers. */
-typedef struct numElem{
-  float xs,ys,xe,ye;
-  unsigned int type;
-}numElem;
+#include "IMRC_types.h"
 
 /* Data for diplaying numbers. */
 const numElem numbers[10][8] = {{{1,0,5,0,LIN}, {0,1,0,9,LIN}, {1,10,5,10,LIN}, {5,1,5,9,LIN}, {0,0,0,0,END}}, /* Zero */
@@ -35,7 +19,14 @@ const numElem numbers[10][8] = {{{1,0,5,0,LIN}, {0,1,0,9,LIN}, {1,10,5,10,LIN}, 
 			  {{0,2,0,1,LIN}, {1,0,5,0,LIN}, {6,1,6,9,LIN}, {1,10,5,10,LIN}, {0,6,0,9,LIN}, {1,5,5,5,LIN}, {0,0,0,0,END}}, /* Nine */
 			  };
 
+extern float *gA, percentY, percentX;
+extern unsigned int nRecieversNow, nSendersNow, gASize;
+extern unsigned char lineWidth, spotSize;
+extern RECIEVER *pRecieversNow;
+extern SENDER *pSendersNow;
+
 #ifndef DEBUG
+
 inline void drawNumber(unsigned char digit, float x, float y){
   unsigned int i = 0;
 
@@ -81,8 +72,10 @@ inline void printNumber(unsigned int number, float x, float y){
     drawNumber(buffer[i-1] - 48, x + 8*i*percentX/10.0, y);
   }
 }
+
 #else
-void drawNumber(unsigned char digit, float x, float y){
+
+void drawDigit(unsigned char digit, float x, float y){
   unsigned int i = 0;
 
   if(digit > 10 || digit < 0){
@@ -126,16 +119,20 @@ void printNumber(unsigned int number, float x, float y){
   i = strlen(&(buffer[0]));
 
   for(; i > 0; i--){
-    drawNumber(buffer[i-1] - 48, x + 8*i*percentX/10.0, y);
+    drawDigit(buffer[i-1] - 48, x + 8*i*percentX/10.0, y);
   }
 }
-#endif
-void draw(void){
-  unsigned int i = 0, j = 0;
-  RECIEVERS_LLIST *temp = NULL;
 
-  if(!pSenders || !pRecievers || nRecievers == 0 || nSenders == 0){
-    (void)puts("Error, initialise graphics first!");
+#endif
+
+void draw(void){
+  unsigned int i = 0;
+  RECIEVERS_LLIST *temp = NULL;
+  SENDER *pTempS = pSendersNow;
+  RECIEVER *pTempR = pRecieversNow;
+
+  if(!pSendersNow || !pRecieversNow || nRecieversNow == 0 || nSendersNow == 0){
+    (void)puts("Error, initialise model first!");
     return;
   }
 
@@ -144,78 +141,85 @@ void draw(void){
   glPointSize(spotSize);
   
   glBegin(GL_POINTS);
-  for(i = 0; i < nSenders; i++){
-    glVertex2f((pSenders + i)->x, (pSenders + i)->y);
+  for(;pTempS; pTempS = pTempS->pNext){
+    glVertex2f(pTempS->x, pTempS->y);
   }
   glEnd();
 
-  for(i = 0; i < nSenders; i++){
-    printNumber(i, (pSenders + i)->x, (pSenders + i)->y);
+  pTempS = pSendersNow;
+
+  for(i = 0; pTempS; pTempS = pTempS->pNext){
+    printNumber(i, pTempS->x, pTempS->y);
+    ++i;
   }
 
   glColor3f(1.0, 1.0, 0.0);
   
   glBegin(GL_POINTS);
-  for(i = 0; i < nRecievers; i++){
-    glVertex2f((pRecievers + i)->x, (pRecievers + i)->y);
+  for(; pTempR; pTempR = pTempR->pNext){
+    glVertex2f(pTempR->x, pTempR->y);
   }
   glEnd();
 
-  for(i = 0; i < nRecievers; i++){
-    printNumber(i, (pRecievers + i)->x, (pRecievers + i)->y);
+  pTempR = pRecieversNow;
+
+  for(i = 0; pTempR; pTempR = pTempR->pNext){
+    printNumber(i, pTempR->x, pTempR->y);
+    ++i;
   }
-
-
-/*  printNumber(777,10,10);*/
 
   glColor3f(0.4, 0.4, 0.4);
   glLineWidth(lineWidth);
 
+  pTempS = pSendersNow;
+
   glBegin(GL_LINES);
-  for(i = 0; i < nSenders; i++){
-    temp = (pSenders + i)->pRecepients;
-    for(j = 0; j < (pSenders + i)->nRecepients; j++){
-      glVertex2f((pSenders + i)->x, (pSenders + i)->y);
+  for(;pTempS; pTempS = pTempS->pNext){
+    temp = pTempS->pRecepients;
+    for(;temp; temp = temp->pNext){
+      glVertex2f(pTempS->x, pTempS->y);
       glVertex2f(temp->pTarget->x, temp->pTarget->y);
-      temp = temp->pNext;
     }
   }
   glEnd();
 
+  pTempS = pSendersNow;
+  pTempR = pRecieversNow;
+
   glColor3f(1.0, 0.0, 0.0);
   glBegin(GL_LINES);
-  for(i = 0; i < nSenders; i++){
-    glVertex2f((pSenders + i)->x, (pSenders + i)->y);
-    glVertex2f((pSenders + i)->x, (pSenders + i)->y + percentY);
+  for(; pTempS; pTempS = pTempS->pNext){
+    glVertex2f(pTempS->x, pTempS->y);
+    glVertex2f(pTempS->x, pTempS->y + percentY);
 
-    glVertex2f((pSenders + i)->x, (pSenders + i)->y + percentY/1.5);
-    glVertex2f((pSenders + i)->x - percentX/3.5, (pSenders + i)->y + percentY);    
-    glVertex2f((pSenders + i)->x, (pSenders + i)->y + percentY/1.5);
-    glVertex2f((pSenders + i)->x + percentX/3.5, (pSenders + i)->y + percentY);
+    glVertex2f(pTempS->x, pTempS->y + percentY/1.5);
+    glVertex2f(pTempS->x - percentX/3.5, pTempS->y + percentY);    
+    glVertex2f(pTempS->x, pTempS->y + percentY/1.5);
+    glVertex2f(pTempS->x + percentX/3.5, pTempS->y + percentY);
     
-    glVertex2f((pSenders + i)->x,(float)(pSenders + i)->y + percentY/3.0);
-    glVertex2f((float)(pSenders + i)->x - percentX/3.0, (pSenders + i)->y);
-    glVertex2f((pSenders + i)->x,(float)(pSenders + i)->y + percentY/3.0);
-    glVertex2f((float)(pSenders + i)->x + percentX/3.0, (pSenders + i)->y);
+    glVertex2f(pTempS->x,(float)pTempS->y + percentY/3.0);
+    glVertex2f((float)pTempS->x - percentX/3.0, pTempS->y);
+    glVertex2f(pTempS->x,(float)pTempS->y + percentY/3.0);
+    glVertex2f((float)pTempS->x + percentX/3.0, pTempS->y);
     
   }
   glEnd();
 
   glColor3f(1.0, 1.0, 0.0);
   glBegin(GL_LINES);
-  for(i = 0; i < nRecievers; i++){
-    glVertex2f((pRecievers + i)->x, (pRecievers + i)->y);
-    glVertex2f((pRecievers + i)->x, (pRecievers + i)->y + percentY);
+  for(; pTempR; pTempR = pTempR->pNext){
+    glVertex2f(pTempR->x, pTempR->y);
+    glVertex2f(pTempR->x, pTempR->y + percentY);
 
-    glVertex2f((pRecievers + i)->x, (pRecievers + i)->y + percentY/1.5);
-    glVertex2f((pRecievers + i)->x + percentX/3.5, (pRecievers + i)->y + percentY);
-    glVertex2f((pRecievers + i)->x, (pRecievers + i)->y + percentY/1.5);
-    glVertex2f((pRecievers + i)->x - percentX/3.5, (pRecievers + i)->y + percentY);
+    glVertex2f(pTempR->x, pTempR->y + percentY/1.5);
+    glVertex2f(pTempR->x + percentX/3.5, pTempR->y + percentY);
+    glVertex2f(pTempR->x, pTempR->y + percentY/1.5);
+    glVertex2f(pTempR->x - percentX/3.5, pTempR->y + percentY);
 
-    glVertex2f((pRecievers + i)->x, (pRecievers + i)->y);
-    glVertex2f((pRecievers + i)->x - percentX/3.0, (pRecievers + i)->y + percentY/3.0);    
-    glVertex2f((pRecievers + i)->x, (pRecievers + i)->y);
-    glVertex2f((pRecievers + i)->x + percentX/3.0, (pRecievers + i)->y + percentY/3.0);
+    glVertex2f(pTempR->x, pTempR->y);
+    glVertex2f(pTempR->x - percentX/3.0, pTempR->y + percentY/3.0);    
+    glVertex2f(pTempR->x, pTempR->y);
+    glVertex2f(pTempR->x + percentX/3.0, pTempR->y + percentY/3.0);
   }
   glEnd();
   glFinish();
@@ -228,13 +232,6 @@ void kboard(unsigned char key, int x, int y){
       break;
     }
   }
-}
-
-void initData(RECIEVER *pReciever, SENDER *pSender, unsigned int senders, unsigned int recievers){
-  pRecievers = pReciever;
-  pSenders = pSender;
-  nRecievers = recievers;
-  nSenders = senders;
 }
 
 void initGraphics(int *argc, char *argv[], unsigned int maxW, unsigned int maxH){
