@@ -145,6 +145,7 @@ void readFromFile(FILE *input){
 
   for(i = 1; i < nRecieversNow; i++){
     pTempR->pNext = calloc(1, sizeof(RECIEVER));
+    pTempR->pNext->pPrev = pTempR;
     pTempR = pTempR->pNext;
     (void)fscanf(input, "%f\t%f\n", &(pTempR->x), &(pTempR->y));
   }
@@ -157,8 +158,11 @@ void readFromFile(FILE *input){
     (void)fscanf(input, "%f\t%f\t%f\t%u\n", &(pTempS->x), &(pTempS->y), &(pTempS->power), &bind);
     bindToReciever(rcvrAtIndex(bind), pTempS);
     pTempS->pNext = calloc(1, sizeof(SENDER));
+    pTempS->pNext->pPrev = pTempS;
     pTempS = pTempS->pNext;
   }
+  pTempS->pPrev->pNext = NULL;
+  (void)free(pTempS);
 
 #ifdef DEBUG
   (void)puts("DEBUG: Successfully read model data from file.");
@@ -194,7 +198,7 @@ RECIEVER *makeRcvrList(unsigned int nRecievers){
     return NULL;
   }
 
-  for(i = 0; i < nRecievers; i++){
+  for(i = 1; i < nRecievers; i++){
     pTemp->pNext = calloc(1, sizeof(RECIEVER));
     if(!pTemp->pNext){
       (void)puts("Error allocating memory for new reciever");
@@ -228,7 +232,7 @@ SENDER *makeSndrList(unsigned int nSenders){
     return NULL;
   }
 
-  for(i = 0; i < nSenders; i++){
+  for(i = 1; i < nSenders; i++){
     pTemp->pNext = calloc(1, sizeof(SENDER));
     if(!pTemp->pNext){
       (void)puts("Error allocating memory for new sender");
