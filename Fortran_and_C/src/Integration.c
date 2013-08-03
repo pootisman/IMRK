@@ -3,10 +3,10 @@
 #include <math.h>
 
 int main(int argc, char *argv[]){
-  float start = 0, stop = 50, step = 0.00001;
+  double start = 0, stop = 500, step = 0.00001;
 
-  float funcField[(unsigned int)round((stop - start)/step)];
-  float sumRes = 0.0, x = 0.0;
+  double funcField[(unsigned int)round((stop - start)/step)];
+  double sumRes = 0.0, x = 0.0;
   
 
 //  (void)printf("Integrating x^2 from %f to %f with step %f.\n", start, stop, step);

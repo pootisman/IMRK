@@ -3,7 +3,8 @@
 
 #include "IMRC_types.h"
 
-/*void initData(RECIEVER *pReciever, SENDER *pSender, unsigned int senders, unsigned int recievers);*/
-void initGraphics( int *argc, char *argv[], unsigned int maxW, unsigned int maxH);
+void initGraphics(void);
+void render(void);
+void killWindow(void);
 
 #endif

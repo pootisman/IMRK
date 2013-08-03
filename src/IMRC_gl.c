@@ -1,8 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <GL/gl.h>
-#include <GL/freeglut.h>
+#include <GLFW/glfw3.h>
 #include "IMRC_gl.h"
 #include "IMRC_types.h"
 
@@ -19,11 +18,13 @@ const numElem numbers[10][8] = {{{1,0,5,0,LIN}, {0,1,0,9,LIN}, {1,10,5,10,LIN}, 
 			  {{0,2,0,1,LIN}, {1,0,5,0,LIN}, {6,1,6,9,LIN}, {1,10,5,10,LIN}, {0,6,0,9,LIN}, {1,5,5,5,LIN}, {0,0,0,0,END}}, /* Nine */
 			  };
 
-extern float *gA, percentY, percentX;
+extern float *gA, percentY, percentX, maxWidthNow, maxHeightNow;
 extern unsigned int nRecieversNow, nSendersNow, gASize;
 extern unsigned char lineWidth, spotSize;
 extern RECIEVER *pRecieversNow;
 extern SENDER *pSendersNow;
+
+GLFWwindow *pWView = NULL;
 
 #ifndef DEBUG
 
@@ -125,7 +126,7 @@ void printNumber(unsigned int number, float x, float y){
 
 #endif
 
-void draw(void){
+void render(void){
   unsigned int i = 0;
   RECIEVERS_LLIST *temp = NULL;
   SENDER *pTempS = pSendersNow;
@@ -225,36 +226,35 @@ void draw(void){
   glFinish();
 }
 
-void kboard(unsigned char key, int x, int y){
-  switch(key){
-    case(27):{
-      glutLeaveMainLoop();
-      break;
-    }
-  }
-}
+void initGraphics(){
+  percentX = maxWidthNow/100.0;
+  percentY = maxHeightNow/100.0;
 
-void initGraphics(int *argc, char *argv[], unsigned int maxW, unsigned int maxH){
-
-  if(argc == NULL || argv == NULL){
-    (void)puts("Error, can't init graphics.");
+  glfwInit();
+  if(!(pWView = glfwCreateWindow(640, 480, "IMRC", NULL, NULL))){
+    (void)puts("Error while initializing graphics!");
+    glfwTerminate();
     return;
   }
 
-  percentX = maxW/100.0;
-  percentY = maxH/100.0;
-
-  glutInit(argc, argv);
-  glutInitDisplayMode( GLUT_RGB | GLUT_SINGLE );
-  glutInitWindowSize(512,512);
-  glutInitWindowPosition(50,50);
-  glutCreateWindow("IMRC");
-  glutFullScreen();
   glClearColor(0.0, 0.0, 0.0, 0.0);
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
-  glOrtho(0.0, maxW, 0.0, maxH, -1.0, 1.0);
-  glutDisplayFunc(draw);
-  glutKeyboardFunc(kboard);
-  glutMainLoop();
+  glOrtho(0.0, maxWidthNow, 0.0, maxHeightNow, -1.0, 1.0);
+#ifdef DEBUG
+  (void)puts("Graphics initialised.");
+#endif
+}
+
+void killWindow(void){
+  if(!pWView){
+    (void)puts("Error, no window to stop.");
+    return;
+  }
+
+  glfwDestroyWindow(pWView);
+  glfwTerminate();
+#ifdef DEBUG
+  (void)puts("DEBUG: Stopped window.");
+#endif
 }

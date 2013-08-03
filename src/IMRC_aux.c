@@ -109,7 +109,7 @@ void unbindReciever(RECIEVER *pReciever){
 }
 
 /* Write current situation to disk */
-void dumpToFile(FILE *output){
+void dumpToFile(FILE *output, unsigned int step){
   unsigned int i = 0;
   RECIEVER *pTempR = pRecieversNow;
 
@@ -117,6 +117,8 @@ void dumpToFile(FILE *output){
     (void)puts("Error, failed to dump data to file.");
     return;
   }
+
+  (void)fprintf(output, "%d\n", step);
 
   for(;pTempR; pTempR = pTempR->pNext){
     (void)fprintf(output, "%d\t%f\t%f\t%f\n", i, pTempR->x,  pTempR->y, pTempR->SNRLin);
@@ -285,8 +287,8 @@ void freeLists(void){
 }
 
 /* Add a new reciever to the list */
-void addReciever(SENDER *pSender, RECIEVER *pRecievers, unsigned int x, unsigned int y){
-  RECIEVER *pTemp = pRecievers;
+void addReciever(SENDER *pSender, unsigned int x, unsigned int y){
+  RECIEVER *pTemp = pRecieversNow;
 
   if(!pTemp){
     (void)puts("Failed to link to NULL.");
