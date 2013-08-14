@@ -84,7 +84,7 @@ void drawDigit(unsigned char digit, float x, float y){
     return;
   }
 
-  (void)printf("Drawing number %d at %f, %f.\n", digit, x, y);
+  (void)printf("DEBUG: Drawing number %d at %f, %f.\n", digit, x, y);
 
   glBegin(GL_LINES);
   while(1){
@@ -224,6 +224,8 @@ void render(void){
   }
   glEnd();
   glFinish();
+  glfwSwapBuffers(pWView);
+  glfwPollEvents();
 }
 
 void initGraphics(){
@@ -237,12 +239,14 @@ void initGraphics(){
     return;
   }
 
+  glfwMakeContextCurrent(pWView);
+
   glClearColor(0.0, 0.0, 0.0, 0.0);
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
   glOrtho(0.0, maxWidthNow, 0.0, maxHeightNow, -1.0, 1.0);
 #ifdef DEBUG
-  (void)puts("Graphics initialised.");
+  (void)puts("DEBUG: Graphics initialised.");
 #endif
 }
 

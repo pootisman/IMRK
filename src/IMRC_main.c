@@ -148,7 +148,7 @@ int main(int argc, char *argv[]){
   
   initModel(maxWidth, maxHeight, model, nRecievers, nSenders, nThreads, I, useGL);
   
-  modelLoop(I, O, 1);
+  modelLoop(O, 50);
 
   stopModel();
 

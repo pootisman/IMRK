@@ -13,7 +13,7 @@ extern SENDER *pSendersNow;
 SENDER *sndrAtIndex(unsigned int index){
   SENDER *pTempS = pSendersNow;
   
-  if(pSendersNow){
+  if(pTempS){
     for(;index > 0; index--){
       if(pTempS){
         pTempS = pTempS->pNext;
@@ -24,7 +24,7 @@ SENDER *sndrAtIndex(unsigned int index){
     }
     return pTempS;
   }else{
-    (void)puts("Error, recieved NULL in sndrAtIndex");
+    (void)puts("Error, no senders in sndrAtIndex");
     return NULL;
   }
 }
@@ -33,7 +33,7 @@ SENDER *sndrAtIndex(unsigned int index){
 RECIEVER *rcvrAtIndex(unsigned int index){
   RECIEVER *pTempR = pRecieversNow;
 
-  if(pRecieversNow){
+  if(pTempR){
     for(;index > 0; index--){
       if(pTempR){
         pTempR = pTempR->pNext;
@@ -44,7 +44,7 @@ RECIEVER *rcvrAtIndex(unsigned int index){
     }
     return pTempR;
   }else{
-    (void)puts("Error, recieved NULL in rcvrAtIndex");
+    (void)puts("Error, no recievers in rcvrAtIndex");
     return NULL;
   }
 }
@@ -120,7 +120,7 @@ void dumpToFile(FILE *output, unsigned int step){
 
   (void)fprintf(output, "%d\n", step);
 
-  for(;pTempR; pTempR = pTempR->pNext){
+  for(;pTempR; pTempR = pTempR->pNext, i++){
     (void)fprintf(output, "%d\t%f\t%f\t%f\n", i, pTempR->x,  pTempR->y, pTempR->SNRLin);
   }
 #ifdef DEBUG
@@ -200,7 +200,7 @@ RECIEVER *makeRcvrList(unsigned int nRecievers){
     return NULL;
   }
 
-  for(i = 1; i < nRecievers; i++){
+  for(i = 1; i < nRecieversNow; i++){
     pTemp->pNext = calloc(1, sizeof(RECIEVER));
     if(!pTemp->pNext){
       (void)puts("Error allocating memory for new reciever");
@@ -234,7 +234,7 @@ SENDER *makeSndrList(unsigned int nSenders){
     return NULL;
   }
 
-  for(i = 1; i < nSenders; i++){
+  for(i = 1; i < nSendersNow; i++){
     pTemp->pNext = calloc(1, sizeof(SENDER));
     if(!pTemp->pNext){
       (void)puts("Error allocating memory for new sender");
@@ -299,8 +299,6 @@ void addReciever(SENDER *pSender, unsigned int x, unsigned int y){
 
   pTemp->pNext = calloc(1, sizeof(RECIEVER));
 
-  nRecieversNow++;
-
   pTemp->pNext->x = x;
   pTemp->pNext->y = y;
 
@@ -312,6 +310,8 @@ void addReciever(SENDER *pSender, unsigned int x, unsigned int y){
   (void)puts("DEBUG: Added new reciever to list.");
 #endif
 
+  nRecieversNow++;
+
 }
 
 /* Remove the reciever from the list */
@@ -320,6 +320,11 @@ void rmReciever(RECIEVER *pReciever){
     (void)puts("Error, got NULL in rmReciever()");
     return;
   }else{
+
+    if(pReciever == pRecieversNow){
+      pRecieversNow = pRecieversNow->pNext;
+    }
+
     if(pReciever->pPrev){
       pReciever->pPrev->pNext = pReciever->pNext;
     }
@@ -333,7 +338,6 @@ void rmReciever(RECIEVER *pReciever){
 
     (void)free(pReciever);
     nRecieversNow--;
-
   }
 
 #ifdef DEBUG

@@ -129,7 +129,6 @@ void *threadPowerCalc(void *args){
   (void)pthread_exit(NULL);
 }
 
-
 /* Unreal mode */
 inline float *prepareSilencing(unsigned int W, unsigned int H){
   unsigned int i = 0, j = 0;
@@ -212,7 +211,7 @@ inline void calcPower(void){
     }
 
     for(i = 0; i < nRecieversNow; i++){
-      *(modRecievers + i) = rand();
+      *(modRecievers + i) = (float)rand()/(float)RAND_MAX;
     }
   }else{
     pTParams = calloc(nThreads, sizeof(THREAD_PARAMS));
@@ -237,7 +236,7 @@ inline void calcPower(void){
     }
 
     for(i = 0; i < nRecieversNow; i++){
-      *(modRecievers + i) = rand();
+      *(modRecievers + i) = (float)rand()/(float)RAND_MAX;
     }
 
     for(i = 0; i < nThreads; i++){
@@ -284,8 +283,6 @@ float genGauss(void){
     S = V1 * V1 + V2 * V2;
   }
   while(S >= 1.0f);
-
-  (void)puts("DEBUG: Successfully generated gaussian value.");
 
   return sqrt(-1.0f * log(S) / S) * V1;
 }
@@ -411,7 +408,7 @@ void calcPower(void){
 
   nThreads = sysconf(_SC_NPROCESSORS_ONLN);
 
-  if(Threads != 0){
+  if(nThreadsNow != 0){
     nThreads = nThreadsNow;
   }
 
@@ -421,10 +418,14 @@ void calcPower(void){
 
   modRecievers = calloc(nRecieversNow, sizeof(float));
 
+  if(!modRecievers){
+    (void)puts("DEBUG: Error, failed to allocate memory for modRecievers.");
+  }
+
   if(nThreads <= 0){
     for(; pTempR; pTempR = pTempR->pNext ){
       for(; pTempS; pTempS = pTempS->pNext){
-        switch(model){
+        switch(modelNow){
           case(1):{
             buffer = power_simple(pTempR, pTempS, *(gA + (unsigned int)floor(pTempR->x) + (unsigned int)(maxWidthNow*floor(pTempR->y))));
             break;
@@ -450,7 +451,7 @@ void calcPower(void){
     }
 
     for(i = 0; i < nRecieversNow; i++){
-      *(modRecievers + i) = rand();
+      *(modRecievers + i) = (float)rand()/(float)RAND_MAX;
     }
   }else{
     pTParams = calloc(nThreads, sizeof(THREAD_PARAMS));
@@ -463,7 +464,7 @@ void calcPower(void){
       (pTParams + i)->pSenders = pSendersNow;
       (pTParams + i)->pRecvrs = rcvrAtIndex(i*(nRecieversNow/nThreads));
       (pTParams + i)->nSenders = nSendersNow;
-      (pTParams + i)->model = model;
+      (pTParams + i)->model = modelNow;
       (pTParams + i)->W = maxWidthNow;
     }
     /* Start all threads */
@@ -475,7 +476,7 @@ void calcPower(void){
     }
 
     for(i = 0; i < nRecieversNow; i++){
-      *(modRecievers + i) = rand();
+      *(modRecievers + i) = (float)rand()/(float)RAND_MAX;
     }
 
     for(i = 0; i < nThreads; i++){
@@ -497,9 +498,6 @@ void initModel(unsigned int W, unsigned int H, unsigned int model, unsigned int 
     return;
   }
 
-  nSendersNow = nSenders;
-  nRecieversNow = nRecievers;
-
   maxWidthNow = W;
   maxHeightNow = H;
 
@@ -510,8 +508,8 @@ void initModel(unsigned int W, unsigned int H, unsigned int model, unsigned int 
   (void)prepareSilencing(W, H);
 
   if(!I){
-    (void)makeRcvrList(nRecieversNow);
-    (void)makeSndrList(nSendersNow);
+    (void)makeRcvrList(nRecievers);
+    (void)makeSndrList(nSenders);
     spawnRecievers(maxWidthNow, maxHeightNow);
     spawnTransmitters(maxWidthNow, maxHeightNow);
   }else{
@@ -528,43 +526,37 @@ void initModel(unsigned int W, unsigned int H, unsigned int model, unsigned int 
 }
 
 /* Model loop */
-void modelLoop(FILE *O, FILE *I, int steps){
+void modelLoop(FILE *O, int steps){
   float genProb = 0.0;
-  char initRun = 1, running = 1;
-  unsigned int step = 0, i = 0;
-  RECIEVER *pTempR = pRecieversNow, *pBuf = NULL;
+  char running = 1;
+  unsigned int step = 0, i = 0, nDeleted;
 
-  if(!pTempR){
+  if(!pRecieversNow){
     (void)puts("Error, got NULL in modelLoop.");
     return; 
   }
 
   while(step < steps && running){
-    if(!initRun){
-      for(i = 0; pTempR && (i < nRecieversNow); pTempR = pTempR->pNext, i++){
+    nDeleted = 0;
+    if(step){
+      for(i = 0; i < nRecieversNow; i++){
         if(*(modRecievers + i) < probDieNow){
-          pBuf = pTempR->pNext;
-          rmReciever(pTempR);
-	  pTempR = pBuf->pPrev;
+          rmReciever(rcvrAtIndex(i - nDeleted));
+	  nDeleted++;
         }
 #ifdef DEBUG
         (void)printf("DEBUG: Reciever %d %s\n", i, (*(modRecievers + i) < probDieNow) ? ("died.") : ("stayed."));
 #endif
       }
 
-      genProb = rand();
-
-      for(i = 0; genProb > probSpawNow; genProb *= genProb){
-        addReciever(sndrAtIndex(rand()%nSendersNow), rand()/RAND_MAX*maxWidthNow, rand()/RAND_MAX*maxHeightNow);
+      for(i = 0,genProb = probSpawNow; genProb > 0.0001; genProb *= genProb, i++){
+        addReciever(sndrAtIndex(rand()%nSendersNow), (float)rand()/(float)RAND_MAX*(float)maxWidthNow, (float)rand()/(float)RAND_MAX*(float)maxHeightNow);
       }
 
 #ifdef DEBUG
-      (void)printf("Spawned %d new recievers.\n", i);
+      (void)printf("DEBUG: Spawned %d new recievers.\n", i);
 #endif
-    }else{
-      if(I){
-        readFromFile(I);
-      }
+      (void)free(modRecievers);
     }
 
     calcPower();
@@ -575,9 +567,9 @@ void modelLoop(FILE *O, FILE *I, int steps){
     
     if(useGraph){
       render();
+      (void)sleep(1);
     }
-    
-    (void)free(modRecievers);
+
     step++;
   }
 }
