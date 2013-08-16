@@ -308,6 +308,8 @@ void addReciever(SENDER *pSender, unsigned int x, unsigned int y){
 
   pTemp->pNext = calloc(1, sizeof(RECIEVER));
 
+  pTemp->pNext->pPrev = pTemp;
+
   pTemp->pNext->x = x;
   pTemp->pNext->y = y;
 

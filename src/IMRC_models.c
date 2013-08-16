@@ -544,6 +544,8 @@ void initModel(unsigned int W, unsigned int H, unsigned int model, unsigned int 
   }
 
   modelNow = model;
+
+  (void)puts("Model initialised.");
 }
 
 /* Model loop */
@@ -560,7 +562,7 @@ void modelLoop(FILE *O, int steps){
   while(step < steps && running){
     nDeleted = 0;
     if(step){
-/*      for(i = 0; i < nRecieversNow; i++){
+      for(i = 0; i < nRecieversNow; i++){
 #ifdef DEBUG
         (void)printf("DEBUG: Reciever %d %s\n", i, (*(modRecievers + i) < probDieNow) ? ("died.") : ("stayed."));
 #endif
@@ -569,7 +571,7 @@ void modelLoop(FILE *O, int steps){
 	  ++nDeleted;
         }
       }
-*/
+
       probLim = (float)rand()/(float)RAND_MAX;
 
       for(i = 0,genProb = probSpawNow; genProb > probLim; genProb *= genProb, i++){
