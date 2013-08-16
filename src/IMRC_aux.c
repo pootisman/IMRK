@@ -58,6 +58,11 @@ void bindToReciever(RECIEVER *pReciever, SENDER *pSender){
     return;
   }
 
+  if(pReciever->pOwner){
+    (void)puts("Error in bindToReciever, reciever already occupied.");
+    return;
+  }
+
   if(!(pSender->pRecepients)){
     pSender->pRecepients = calloc(1, sizeof(RECIEVERS_LLIST));
     pSender->nRecepients = 1;
@@ -92,23 +97,31 @@ void unbindReciever(RECIEVER *pReciever){
 
   for(;pTempS; pTempS = pTempS->pNext){
     pTempR = pTempS->pRecepients;
-    for(i = 0; i < pTempS->nRecepients; ++i){
+    for(i = 0; i < pTempS->nRecepients; i++){
       if(pTempR->pTarget == pReciever){
-        if(pTempR->pPrev){
+        
+	if(pTempR->pPrev){
           pTempR->pPrev->pNext = pTempR->pNext;
 	}
-	if(pTempR->pNext)
+	
+	if(pTempR->pNext){
 	 pTempR->pNext->pPrev = pTempR->pPrev;
         }
-      }
-    }
- 
-  pReciever->recalc = 0;
+        
+        if(pTempR == pTempS->pRecepients){
+          pTempS->pRecepients = pTempR->pNext;
+	}
 
+	pTempS->nRecepients--;
+        (void)free(pTempR);
 #ifdef DEBUG
-  (void)printf("DEBUG: Successfull unbind:[%f:%f]\n", pReciever->x, pReciever->y);
+	(void)printf("DEBUG: Successfull unbind:[%f:%f]\n", pReciever->x, pReciever->y);
 #endif
-
+	return;
+      }
+      pTempR = pTempR->pNext;
+    }
+  }
 }
 
 /* Write current situation to disk */
