@@ -71,6 +71,7 @@ void bindToReciever(RECIEVER *pReciever, SENDER *pSender){
     pSender->nRecepients++;
   }
 
+  pReciever->recalc = 1;
   pReciever->pOwner = pSender;
 
 #ifdef DEBUG
@@ -102,6 +103,8 @@ void unbindReciever(RECIEVER *pReciever){
       }
     }
  
+  pReciever->recalc = 0;
+
 #ifdef DEBUG
   (void)printf("DEBUG: Successfull unbind:[%f:%f]\n", pReciever->x, pReciever->y);
 #endif
@@ -143,12 +146,15 @@ void readFromFile(FILE *input){
 
   pRecieversNow = pTempR = calloc( 1, sizeof(RECIEVER));
 
+  pTempR->recalc = 1;
+
   (void)fscanf(input, "%f\t%f\n", &(pTempR->x), &(pTempR->y));
 
   for(i = 1; i < nRecieversNow; i++){
     pTempR->pNext = calloc(1, sizeof(RECIEVER));
     pTempR->pNext->pPrev = pTempR;
     pTempR = pTempR->pNext;
+    pTempR->recalc = 1;
     (void)fscanf(input, "%f\t%f\n", &(pTempR->x), &(pTempR->y));
   }
 
@@ -200,6 +206,8 @@ RECIEVER *makeRcvrList(unsigned int nRecievers){
     return NULL;
   }
 
+  pTemp->recalc = 1;
+
   for(i = 1; i < nRecieversNow; i++){
     pTemp->pNext = calloc(1, sizeof(RECIEVER));
     if(!pTemp->pNext){
@@ -208,6 +216,7 @@ RECIEVER *makeRcvrList(unsigned int nRecievers){
     }
     pTemp->pNext->pPrev = pTemp;
     pTemp = pTemp->pNext;
+    pTemp->recalc = 1;
   }
 
 #ifdef DEBUG
@@ -302,16 +311,16 @@ void addReciever(SENDER *pSender, unsigned int x, unsigned int y){
   pTemp->pNext->x = x;
   pTemp->pNext->y = y;
 
+  ++nRecieversNow;
+
   if(pSender){
+    pTemp->pNext->recalc = 1;
     bindToReciever(pTemp->pNext, pSender); 
   }
 
 #ifdef DEBUG
   (void)puts("DEBUG: Added new reciever to list.");
 #endif
-
-  nRecieversNow++;
-
 }
 
 /* Remove the reciever from the list */
@@ -319,26 +328,26 @@ void rmReciever(RECIEVER *pReciever){
   if(!pReciever || !pRecieversNow){
     (void)puts("Error, got NULL in rmReciever()");
     return;
-  }else{
-
-    if(pReciever == pRecieversNow){
-      pRecieversNow = pRecieversNow->pNext;
-    }
-
-    if(pReciever->pPrev){
-      pReciever->pPrev->pNext = pReciever->pNext;
-    }
-    if(pReciever->pNext){
-      pReciever->pNext->pPrev = pReciever->pPrev;
-    }
-
-    if(pSendersNow){
-      unbindReciever(pReciever);
-    }
-
-    (void)free(pReciever);
-    nRecieversNow--;
   }
+
+  if(pReciever == pRecieversNow){
+    pRecieversNow = pRecieversNow->pNext;
+  }
+
+  if(pReciever->pPrev){
+    pReciever->pPrev->pNext = pReciever->pNext;
+  }
+  
+  if(pReciever->pNext){
+    pReciever->pNext->pPrev = pReciever->pPrev;
+  }
+
+  if(pSendersNow){
+    unbindReciever(pReciever);
+  }
+  
+  --nRecieversNow;
+  (void)free(pReciever);
 
 #ifdef DEBUG
   (void)puts("DEBUG: Removed reciever from list.");

@@ -14,7 +14,7 @@
 
 extern float *gA, percentY, percentX, *modRecievers, maxWidthNow, maxHeightNow, probDieNow, probSpawNow;
 extern unsigned int nRecieversNow, nSendersNow, gASize, useGraph;
-extern unsigned char lineWidth, spotSize, modelNow, nThreadsNow;
+extern unsigned char lineWidth, spotSize, modelNow, nThreadsNow, sendersChanged;
 extern RECIEVER *pRecieversNow;
 extern SENDER *pSendersNow;
 
@@ -99,30 +99,35 @@ void *threadPowerCalc(void *args){
   pReciever = task->pRecvrs;
 
   for(i = 0; i < task->steps; i++){
-    pSender = task->pSenders;
-    for(j = 0; j < task->nSenders; j++){
-      switch(task->model){
-        case(1):{
-          buffer = power_simple(pReciever, pSender, *(gA + (unsigned int)floor(pReciever->x) + (unsigned int)(task->W*floor(pReciever->y))));
-          break;
-	}
-	case(2):{
-	  buffer = power_complex(pReciever, pSender, *(gA + (unsigned int)floor(pReciever->x) + (unsigned int)(task->W*floor(pReciever->y))), 1.5, 1.5, 2.4e9);
-	  break;
-	}
-	default:{
-	  (void)puts("Error, mode not suppoted.");
-	  pthread_exit(NULL); 
-	}
+    if(pReciever->recalc || sendersChanged){
+      pSender = task->pSenders;
+      for(j = 0; j < task->nSenders; j++){
+        switch(task->model){
+          case(1):{
+            buffer = power_simple(pReciever, pSender, *(gA + (unsigned int)floor(pReciever->x) + (unsigned int)(task->W*floor(pReciever->y))));
+            break;
+	  }
+	  case(2):{
+	    buffer = power_complex(pReciever, pSender, *(gA + (unsigned int)floor(pReciever->x) + (unsigned int)(task->W*floor(pReciever->y))), 1.5, 1.5, 2.4e9);
+	    break;
+	  }
+	  default:{
+	    (void)puts("Error, mode not suppoted.");
+	    pthread_exit(NULL); 
+	  }
+        }
+      
+	if(buffer > 0.0){
+          pReciever->signal += buffer;
+        }else{
+	  pReciever->waste -= buffer;
+        }
+	pSender = pSender->pNext;
       }
-      if(buffer > 0.0){
-        pReciever->signal += buffer;
-      }else{
-	pReciever->waste -= buffer;
-      }
-      pSender = pSender->pNext;
+    
+      pReciever->SNRLin = pReciever->signal/pReciever->waste;
+      pReciever->recalc = 0;
     }
-    pReciever->SNRLin = pReciever->signal/pReciever->waste;
     pReciever = pReciever->pNext;
   }
 
@@ -184,30 +189,35 @@ inline void calcPower(void){
 
   if(nThreads <= 0){
     for(; pTempR; pTempR = pTempR->pNext ){
-      for(; pTempS; pTempS = pTempS->pNext){
-        switch(modelNow){
-          case(1):{
-            buffer = power_simple(pTempR, pTempS, *(gA + (unsigned int)floor(pTempR->x) + (unsigned int)(maxWidthNow*floor(pTempR->y))));
-            break;
-	  }
-	  case(2):{
-	    buffer = power_complex(pTempR, pTempS, *(gA + (unsigned int)floor(pTempR->x) + (unsigned int)(maxWidthNow*floor(pTempR->y))), 1.5, 1.5, 2.4e9);
-	    break;
-	  }
-	  default:{
-	    (void)puts("Error, mode not suppoted.");
-  	    return;
-  	  }
+      if(pTempR->recalc || sendersChanged){
+        for(; pTempS; pTempS = pTempS->pNext){
+          switch(modelNow){
+            case(1):{
+              buffer = power_simple(pTempR, pTempS, *(gA + (unsigned int)floor(pTempR->x) + (unsigned int)(maxWidthNow*floor(pTempR->y))));
+              break;
+	    }
+	    case(2):{
+	      buffer = power_complex(pTempR, pTempS, *(gA + (unsigned int)floor(pTempR->x) + (unsigned int)(maxWidthNow*floor(pTempR->y))), 1.5, 1.5, 2.4e9);
+	      break;
+	    }
+	    default:{
+	      (void)puts("Error, mode not suppoted.");
+  	      return;
+  	    }
+          }
+          if(buffer > 0.0){
+            pTempR->signal += buffer;
+          }else{
+  	    pTempR->waste -= buffer;
+          }
+
+	  pTempS = pTempS->pNext;
         }
-        if(buffer > 0.0){
-          pTempR->signal += buffer;
-        }else{
-	  pTempR->waste -= buffer;
-        }
-	pTempR = pTempR->pNext;
+       
+	pTempR->SNRLin = pTempR->signal/pTempR->waste;
+	pTempR->recalc = 0;
       }
-      pTempR->SNRLin = pTempR->signal/pTempR->waste;
-      pTempS = pTempS->pNext;
+      pTempR = pTempR->pNext;
     }
 
     for(i = 0; i < nRecieversNow; i++){
@@ -331,30 +341,35 @@ void *threadPowerCalc(void *args){
   pReciever = task->pRecvrs;
 
   for(i = 0; i < task->steps; i++){
-    pSender = task->pSenders;
-    for(j = 0; j < task->nSenders; j++){
-      switch(task->model){
-        case(1):{
-          buffer = power_simple(pReciever, pSender, *(gA + (unsigned int)floor(pReciever->x) + (unsigned int)(task->W*floor(pReciever->y))));
-          break;
-	}
-	case(2):{
-	  buffer = power_complex(pReciever, pSender, *(gA + (unsigned int)floor(pReciever->x) + (unsigned int)(task->W*floor(pReciever->y))), 1.5, 1.5, 2.4e9);
-	  break;
-	}
-	default:{
-	  (void)puts("Error, mode not suppoted.");
-	  pthread_exit(NULL); 
-	}
+    if(pReciever->recalc || sendersChanged){
+      pSender = task->pSenders;
+      for(j = 0; j < task->nSenders; j++){
+        switch(task->model){
+          case(1):{
+            buffer = power_simple(pReciever, pSender, *(gA + (unsigned int)floor(pReciever->x) + (unsigned int)(task->W*floor(pReciever->y))));
+            break;
+	  }
+	  case(2):{
+	    buffer = power_complex(pReciever, pSender, *(gA + (unsigned int)floor(pReciever->x) + (unsigned int)(task->W*floor(pReciever->y))), 1.5, 1.5, 2.4e9);
+	    break;
+	  }
+	  default:{
+	    (void)puts("Error, mode not suppoted.");
+	    pthread_exit(NULL); 
+	  }
+        }
+      
+	if(buffer > 0.0){
+          pReciever->signal += buffer;
+        }else{
+	  pReciever->waste -= buffer;
+        }
+        
+	pSender = pSender->pNext;
       }
-      if(buffer > 0.0){
-        pReciever->signal += buffer;
-      }else{
-	pReciever->waste -= buffer;
-      }
-      pSender = pSender->pNext;
+      pReciever->SNRLin = pReciever->signal/pReciever->waste;
+      pReciever->recalc = 0;
     }
-    pReciever->SNRLin = pReciever->signal/pReciever->waste;
     pReciever = pReciever->pNext;
   }
 
@@ -424,29 +439,35 @@ void calcPower(void){
 
   if(nThreads <= 0){
     for(; pTempR; pTempR = pTempR->pNext ){
-      for(; pTempS; pTempS = pTempS->pNext){
-        switch(modelNow){
-          case(1):{
-            buffer = power_simple(pTempR, pTempS, *(gA + (unsigned int)floor(pTempR->x) + (unsigned int)(maxWidthNow*floor(pTempR->y))));
-            break;
-	  }
-	  case(2):{
-	    buffer = power_complex(pTempR, pTempS, *(gA + (unsigned int)floor(pTempR->x) + (unsigned int)(maxWidthNow*floor(pTempR->y))), 1.5, 1.5, 2.4e9);
-	    break;
-	  }
-	  default:{
-	    (void)puts("Error, mode not suppoted.");
-  	    return;
-  	  }
+      if(pTempR->recalc || sendersChanged){
+        for(; pTempS; pTempS = pTempS->pNext){
+          switch(modelNow){
+            case(1):{
+              buffer = power_simple(pTempR, pTempS, *(gA + (unsigned int)floor(pTempR->x) + (unsigned int)(maxWidthNow*floor(pTempR->y))));
+              break;
+	    }
+	    case(2):{
+	      buffer = power_complex(pTempR, pTempS, *(gA + (unsigned int)floor(pTempR->x) + (unsigned int)(maxWidthNow*floor(pTempR->y))), 1.5, 1.5, 2.4e9);
+	      break;
+	    }
+	    default:{
+	      (void)puts("Error, mode not suppoted.");
+  	      return;
+  	    }
+          }
+        
+	  if(buffer > 0.0){
+            pTempR->signal += buffer;
+          }else{
+	    pTempR->waste -= buffer;
+          }
+
+	  pTempR = pTempR->pNext;
         }
-        if(buffer > 0.0){
-          pTempR->signal += buffer;
-        }else{
-	  pTempR->waste -= buffer;
-        }
-	pTempR = pTempR->pNext;
+      
+	pTempR->SNRLin = pTempR->signal/pTempR->waste;
+	pTempR->recalc = 0;
       }
-      pTempR->SNRLin = pTempR->signal/pTempR->waste;
       pTempS = pTempS->pNext;
     }
 
@@ -527,7 +548,7 @@ void initModel(unsigned int W, unsigned int H, unsigned int model, unsigned int 
 
 /* Model loop */
 void modelLoop(FILE *O, int steps){
-  float genProb = 0.0;
+  float genProb = 0.0f, probLim = 0.0f;
   char running = 1;
   unsigned int step = 0, i = 0, nDeleted;
 
@@ -539,22 +560,24 @@ void modelLoop(FILE *O, int steps){
   while(step < steps && running){
     nDeleted = 0;
     if(step){
-      for(i = 0; i < nRecieversNow; i++){
-        if(*(modRecievers + i) < probDieNow){
-          rmReciever(rcvrAtIndex(i - nDeleted));
-	  nDeleted++;
-        }
+/*      for(i = 0; i < nRecieversNow; i++){
 #ifdef DEBUG
         (void)printf("DEBUG: Reciever %d %s\n", i, (*(modRecievers + i) < probDieNow) ? ("died.") : ("stayed."));
 #endif
+        if(*(modRecievers + i) < probDieNow){
+          rmReciever(rcvrAtIndex(i - nDeleted));
+	  ++nDeleted;
+        }
       }
+*/
+      probLim = (float)rand()/(float)RAND_MAX;
 
-      for(i = 0,genProb = probSpawNow; genProb > 0.0001; genProb *= genProb, i++){
+      for(i = 0,genProb = probSpawNow; genProb > probLim; genProb *= genProb, i++){
         addReciever(sndrAtIndex(rand()%nSendersNow), (float)rand()/(float)RAND_MAX*(float)maxWidthNow, (float)rand()/(float)RAND_MAX*(float)maxHeightNow);
       }
 
 #ifdef DEBUG
-      (void)printf("DEBUG: Spawned %d new recievers.\n", i);
+      (void)printf("DEBUG: Spawned %d new recievers, there are now %d.\n", i, nRecieversNow);
 #endif
       (void)free(modRecievers);
     }
@@ -645,8 +668,9 @@ void stopModel(void){
     }
   }
 
+  (void)free(gA);
   (void)freeLists();
-
+  (void)free(modRecievers);
 #ifdef DEBUG
   (void)puts("DEBUG: Stopped model.");
 #endif

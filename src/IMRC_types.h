@@ -12,6 +12,7 @@ typedef struct RECIEVER{
   float SNRLin; /* SNR in linear scale */
   struct RECIEVER *pNext, *pPrev; /* Linked list */
   struct SENDER *pOwner; /* Our transmitter */
+  char recalc; /* Should we re-calculate power for this reciever */
 }RECIEVER;
 
 typedef struct RECIEVERS_LLIST{
@@ -37,7 +38,7 @@ typedef struct numElem{
 #ifdef NOT_MAIN
 float *gA = NULL, percentY = 0.0, percentX = 0.0, maxWidthNow = 0.0, maxHeightNow = 0.0, *modRecievers = NULL, probDieNow = 0.1, probSpawNow = 0.9;
 unsigned int nRecieversNow = 0, nSendersNow = 0, gASize = 0, useGraph = 0;
-unsigned char lineWidth = 1, spotSize = 2, modelNow = 1, nThreadsNow = 0;
+unsigned char lineWidth = 1, spotSize = 2, modelNow = 1, nThreadsNow = 0, sendersChanged = 0;
 RECIEVER *pRecieversNow = NULL;
 SENDER *pSendersNow = NULL;
 #endif
