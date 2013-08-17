@@ -15,9 +15,9 @@
 #define VALID_PROB(prob1, prob2) ((prob1 >= 0.0) && (prob1 <= 1.0) && (prob2 >= 0.0) && (prob2 <= 1.0) && ((prob1 + prob2) == 1))
 
 /* Help string */
-#define HELP "Help for IMRC:\n===================================\n-W maximum x coordinates.\n-H maximum y coordinates.\n-R amount of recievers to spawn.\n-S amount of transmitters to spawn.\n-F file to read graph from.\n-O file for SNR output.\n-T number of threads to run.\n-G use graphics.\n-M model selection\n-D Die probability\n-N Spawn probability\n-h This message\n===================================\nINFO FOR GRAPHICS MODE:\nRED - transmitter.\nYELLOW - reciever."
+#define HELP "Help for IMRC:\n===================================\n-W maximum x coordinates.\n-H maximum y coordinates.\n-R amount of recievers to spawn.\n-S amount of transmitters to spawn.\n-F file to read graph from.\n-O file for SNR output.\n-T number of threads to run.\n-G use graphics.\n-M model selection\n-D Die probability\n-N Spawn probability\n-I Iterations to run\n-h This message\n===================================\nINFO FOR GRAPHICS MODE:\nRED - transmitter.\nYELLOW - reciever."
 
-#define VALID_ARGS "W:H:R:S:F:O:T:GM:D:N:h" /* Valid arguments for the shell */
+#define VALID_ARGS "W:H:R:S:F:O:T:M:D:N:I:Gh" /* Valid arguments for the shell */
 #define DEF_WIDTH 255 /* Default width of our silencing matrice */
 #define DEF_HEIGHT 255 /* Default height of our silencing matrice */
 #define DEF_THREADS 0 /* Default number of threads to use */
@@ -26,10 +26,11 @@
 #define DEF_MODEL 1 /* Default model type */
 #define DEF_PROB_NEW 0.9 /* Default probability of the new reciever spawn */
 #define DEF_PROB_DIE 0.1 /* Default probability of the reciever death (disconnect) */
+#define DEF_ITERATIONS 1 /* Default number of iterations */
 
 int main(int argc, char *argv[]){
-  unsigned int maxHeight = DEF_HEIGHT, maxWidth = DEF_WIDTH, nRecievers = DEF_RECIEVERS, nSenders = DEF_SENDERS, i = 2, model = DEF_MODEL;
-  int opt = 0, useGL = 0, fileo = 0, filei = 0, nThreads = DEF_THREADS;
+  unsigned int maxHeight = DEF_HEIGHT, maxWidth = DEF_WIDTH, nRecievers = DEF_RECIEVERS, nSenders = DEF_SENDERS, nIterations = DEF_ITERATIONS, model = DEF_MODEL;
+  int opt = 0, useGL = 0, fileo = 0, filei = 0, nThreads = DEF_THREADS, i = 2;
   FILE *I = NULL, *O = NULL;
   float probSpawn = DEF_PROB_NEW, probDie = DEF_PROB_DIE;
 #ifdef DEBUG
@@ -57,54 +58,61 @@ int main(int argc, char *argv[]){
 	}
 	break;
       }
+      case('I'):{
+	if(argv[i]){
+          nIterations = atoi(argv[i]);
+	  ++i;
+	}
+	break;
+      }
       case('G'):{
 	useGL = 1;
 	break;
       }
       case('H'):{
-        if(argv[i] != NULL){
+        if(argv[i]){
           maxHeight = atoi(argv[i]);
 	}
 	++i;
         break;
       }
       case('W'):{
-        if(argv[i] != NULL){
+        if(argv[i]){
 	  maxWidth = atoi(argv[i]);
 	}
 	++i;
 	break;
       }
       case('T'):{
-	if(argv[i] != NULL){
+	if(argv[i]){
 	  nThreads = atoi(argv[i]);
 	}
 	++i;
 	break;
       }
       case('S'):{
-	if(argv[i] != NULL){
+	if(argv[i]){
 	  nSenders = atoi(argv[i]);
 	}
 	++i;
 	break;
       }
       case('R'):{
-        if(argv[i] != NULL){
+        if(argv[i]){
 	  nRecievers = atoi(argv[i]);
 	}
 	++i;
 	break;
       }
       case('M'):{
-        if(argv[i] != NULL){
+        if(argv[i]){
 	  model = atoi(argv[i]);
 	}
 	++i;
 	break;
       }
       case('F'):{
-	if(argv[i] != NULL){
+	if(argv[i]){
 	  I = fopen(argv[i], "r");
 
 	  if(!I){
@@ -120,7 +128,7 @@ int main(int argc, char *argv[]){
 	break;
       }
       case('O'):{
-	if(argv[i] != NULL){
+	if(argv[i]){
 	  O = fopen( argv[i],"w");
 	  if(!O){
 	    (void)puts("Error, can't open file, terminating.");
@@ -146,9 +154,9 @@ int main(int argc, char *argv[]){
     ++i;
   }
   
-  initModel(maxWidth, maxHeight, model, nRecievers, nSenders, nThreads, I, useGL);
+  initModel(maxWidth, maxHeight, model, nRecievers, nSenders, nThreads, I, useGL, probSpawn, probDie);
   
-  modelLoop(O, 50);
+  modelLoop(O, nIterations);
 
   stopModel();
 

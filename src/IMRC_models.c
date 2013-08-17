@@ -12,7 +12,7 @@
 
 #define M_PI 3.14159265358979323846264338327
 
-extern float *gA, percentY, percentX, *modRecievers, maxWidthNow, maxHeightNow, probDieNow, probSpawNow;
+extern float *gA, percentY, percentX, *modRecievers, maxWidthNow, maxHeightNow, probDieNow, probSpawnNow;
 extern unsigned int nRecieversNow, nSendersNow, gASize, useGraph;
 extern unsigned char lineWidth, spotSize, modelNow, nThreadsNow, sendersChanged;
 extern RECIEVER *pRecieversNow;
@@ -512,12 +512,15 @@ void calcPower(void){
 #endif
 
 /* Initialise model */
-void initModel(unsigned int W, unsigned int H, unsigned int model, unsigned int nRecievers, unsigned int nSenders, unsigned int nThreads, FILE *I, unsigned int useGL){
+void initModel(unsigned int W, unsigned int H, unsigned int model, unsigned int nRecievers, unsigned int nSenders, unsigned int nThreads, FILE *I, unsigned int useGL, float probSpawn, float probDie){
   
   if(!W || !H || !model || !nRecievers || !nSenders){
     (void)puts("Error, can't initialize model with invalid parameters.");
     return;
   }
+
+  probDieNow = probDie;
+  probSpawnNow = probSpawn;
 
   maxWidthNow = W;
   maxHeightNow = H;
@@ -544,12 +547,13 @@ void initModel(unsigned int W, unsigned int H, unsigned int model, unsigned int 
   }
 
   modelNow = model;
-
+#ifdef DEBUG
   (void)puts("Model initialised.");
+#endif
 }
 
 /* Model loop */
-void modelLoop(FILE *O, int steps){
+void modelLoop(FILE *O, unsigned int steps){
   float genProb = 0.0f, probLim = 0.0f;
   char running = 1;
   unsigned int step = 0, i = 0, nDeleted;
@@ -574,7 +578,7 @@ void modelLoop(FILE *O, int steps){
 
       probLim = (float)rand()/(float)RAND_MAX;
 
-      for(i = 0,genProb = probSpawNow; genProb > probLim; genProb *= genProb, i++){
+      for(i = 0,genProb = probSpawnNow; genProb > probLim; genProb *= genProb, i++){
         addReciever(sndrAtIndex(rand()%nSendersNow), (float)rand()/(float)RAND_MAX*(float)maxWidthNow, (float)rand()/(float)RAND_MAX*(float)maxHeightNow);
       }
 
