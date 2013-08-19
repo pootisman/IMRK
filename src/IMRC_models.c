@@ -125,7 +125,7 @@ void *threadPowerCalc(void *args){
 	pSender = pSender->pNext;
       }
     
-      pReciever->SNRLin = pReciever->signal/pReciever->waste;
+      pReciever->SNRLin = 10.0*log10(pReciever->signal/pReciever->waste);
       pReciever->recalc = 0;
     }
     pReciever = pReciever->pNext;
@@ -214,7 +214,7 @@ inline void calcPower(void){
 	  pTempS = pTempS->pNext;
         }
        
-	pTempR->SNRLin = pTempR->signal/pTempR->waste;
+	pTempR->SNRLin = 10.0*log10(pTempR->signal/pTempR->waste);
 	pTempR->recalc = 0;
       }
       pTempR = pTempR->pNext;
@@ -367,7 +367,7 @@ void *threadPowerCalc(void *args){
         
 	pSender = pSender->pNext;
       }
-      pReciever->SNRLin = pReciever->signal/pReciever->waste;
+      pReciever->SNRLin = 10.0*log10(pReciever->signal/pReciever->waste);
       pReciever->recalc = 0;
     }
     pReciever = pReciever->pNext;
@@ -465,7 +465,7 @@ void calcPower(void){
 	  pTempR = pTempR->pNext;
         }
       
-	pTempR->SNRLin = pTempR->signal/pTempR->waste;
+	pTempR->SNRLin = 10.0*log10(pTempR->signal/pTempR->waste);
 	pTempR->recalc = 0;
       }
       pTempS = pTempS->pNext;
