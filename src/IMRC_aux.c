@@ -175,15 +175,17 @@ void readFromFile(FILE *input){
 
   pSendersNow = pTempS = calloc( 1, sizeof(SENDER));
 
-  for(i = 0; i < nSendersNow; i++){
-    (void)fscanf(input, "%f\t%f\t%f\t%u\n", &(pTempS->x), &(pTempS->y), &(pTempS->power), &bind);
-    bindToReciever(rcvrAtIndex(bind), pTempS);
+  (void)fscanf(input, "%f\t%f\t%f\t%u\t%f\n", &(pTempS->x), &(pTempS->y), &(pTempS->power), &bind, &(pTempS->freq));
+
+  bindToReciever(rcvrAtIndex(bind), pTempS);
+
+  for(i = 1; i < nSendersNow; i++){
     pTempS->pNext = calloc(1, sizeof(SENDER));
     pTempS->pNext->pPrev = pTempS;
     pTempS = pTempS->pNext;
+    (void)fscanf(input, "%f\t%f\t%f\t%u\t%f\n", &(pTempS->x), &(pTempS->y), &(pTempS->power), &bind, &(pTempS->freq));
+    bindToReciever(rcvrAtIndex(bind), pTempS);
   }
-  pTempS->pPrev->pNext = NULL;
-  (void)free(pTempS);
 
 #ifdef DEBUG
   (void)puts("DEBUG: Successfully read model data from file.");

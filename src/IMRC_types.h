@@ -23,6 +23,7 @@ typedef struct RECIEVERS_LLIST{
 typedef struct SENDER{
   float x, y; /* Position */
   float power; /* Strength of the transmitter */
+  float freq; /* Transmitter frequency in Hz */
   RECIEVERS_LLIST *pRecepients; /* Guys who will recieve data from us */
   unsigned int nRecepients;/* Number of recepients for this node */
   struct SENDER *pNext, *pPrev; /* Linked list */

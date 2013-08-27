@@ -80,7 +80,12 @@ inline float power_simple(RECIEVER *pRecvr, const SENDER *pSender, const float a
 
 /* Slightly more realistic model power calculation */
 inline float power_complex(RECIEVER *pRecvr, const SENDER *pSender, const float amp, const float Ht, const float Hr, const float freq){
-  return (distance_euclid(pRecvr, pSender) == 0) ? (0) : (isUseful(pRecvr, pSender) ? (1) : (-1))*(20.0*log10(4.0*M_PI/(3e8/freq)) - 2.0 * Hr + 40.0*log10(distance_euclid(pRecvr, pSender)));
+  return (distance_euclid(pRecvr, pSender) == 0) ? (0) : (isUseful(pRecvr, pSender) ? (1) : (-1))*(20.0*log10(4.0*M_PI/(3e8/pSender->freq)) - 2.0 * Hr + 40.0*log10(distance_euclid(pRecvr, pSender)));
+}
+
+/* Model for urban/suburban environments */
+inline float power_urban_simple(RECIEVER *pRecvr, const SENDER *pSender, const float amp){
+  return ((isUseful(pRecvr, pSender)) ? (1) : (-1)) * (pSender->power - 40.0*log10(distance_euclid(pRecvr, pSender)/1000.0) - 30.0*log10(pSender->freq/1000000.0) - 49.0 - amp);
 }
 
 /* Function for threaded calculations */
@@ -111,6 +116,10 @@ void *threadPowerCalc(void *args){
 	    buffer = power_complex(pReciever, pSender, *(gA + (unsigned int)floor(pReciever->x) + (unsigned int)(task->W*floor(pReciever->y))), 1.5, 1.5, 2.4e9);
 	    break;
 	  }
+	  case(3):{
+	    buffer = power_urban_simple(pReciever, pSender, *(gA + (unsigned int)floor(pReciever->x) + (unsigned int)(task->W*floor(pReciever->y))));
+	    break;
+	  }
 	  default:{
 	    (void)puts("Error, mode not suppoted.");
 	    pthread_exit(NULL); 
@@ -124,8 +133,12 @@ void *threadPowerCalc(void *args){
         }
 	pSender = pSender->pNext;
       }
-    
-      pReciever->SNRLin = 10.0*log10(pReciever->signal/pReciever->waste);
+   
+      if(task->model != 3){
+        pReciever->SNRLin = 10.0*log10(pReciever->signal/pReciever->waste);
+      }else{
+        pReciever->SNRLin = pReciever->signal - pReciever->waste;
+      }
       pReciever->recalc = 0;
     }
     pReciever = pReciever->pNext;
@@ -200,6 +213,10 @@ inline void calcPower(void){
 	      buffer = power_complex(pTempR, pTempS, *(gA + (unsigned int)floor(pTempR->x) + (unsigned int)(maxWidthNow*floor(pTempR->y))), 1.5, 1.5, 2.4e9);
 	      break;
 	    }
+	    case(3):{
+	      buffer = power_urban_simple(pTempR, pTempS, *(gA + (unsigned int)floor(pTempR->x) + (unsigned int)(maxWidthNow*floor(pTempR->y))));
+	      break;
+	    }
 	    default:{
 	      (void)puts("Error, mode not suppoted.");
   	      return;
@@ -213,8 +230,12 @@ inline void calcPower(void){
 
 	  pTempS = pTempS->pNext;
         }
-       
-	pTempR->SNRLin = 10.0*log10(pTempR->signal/pTempR->waste);
+    
+        if(modelNow != 3){
+          pTempR->SNRLin = 10.0*log10(pTempR->signal/pTempR->waste);
+        }else{
+          pTempR->SNRLin = pTempR->signal - pTempR->waste;
+        }   
 	pTempR->recalc = 0;
       }
       pTempR = pTempR->pNext;
@@ -323,6 +344,13 @@ float power_complex(RECIEVER *pRecvr, const SENDER *pSender, const float amp, co
   (void)puts("DEBUG: Successfully calculated signal power using complex model.");
 }
 
+/* Model for urban/suburban environments */
+float power_urban_simple(RECIEVER *pRecvr, const SENDER *pSender, const float amp){
+  return ((isUseful(pRecvr, pSender)) ? (1) : (-1)) * (pSender->power - 40.0*log10(distance_euclid(pRecvr, pSender)/1000.0) - 30.0*log10(pSender->freq/1000000.0) - 49.0 - amp);
+
+ (void)puts("DEBUG: Successfully calculated signal power using urban model.");
+}
+
 /* Function for threaded calculations */
 void *threadPowerCalc(void *args){
   THREAD_PARAMS *task = (THREAD_PARAMS *)args;
@@ -353,6 +381,10 @@ void *threadPowerCalc(void *args){
 	    buffer = power_complex(pReciever, pSender, *(gA + (unsigned int)floor(pReciever->x) + (unsigned int)(task->W*floor(pReciever->y))), 1.5, 1.5, 2.4e9);
 	    break;
 	  }
+	  case(3):{
+	    buffer = power_urban_simple(pReciever, pSender, *(gA + (unsigned int)floor(pReciever->x) + (unsigned int)(task->W*floor(pReciever->y))));
+	    break;
+	  }
 	  default:{
 	    (void)puts("Error, mode not suppoted.");
 	    pthread_exit(NULL); 
@@ -367,7 +399,11 @@ void *threadPowerCalc(void *args){
         
 	pSender = pSender->pNext;
       }
-      pReciever->SNRLin = 10.0*log10(pReciever->signal/pReciever->waste);
+      if(task->model != 3){
+        pReciever->SNRLin = 10.0*log10(pReciever->signal/pReciever->waste);
+      }else{
+        pReciever->SNRLin = pReciever->signal - pReciever->waste;
+      } 
       pReciever->recalc = 0;
     }
     pReciever = pReciever->pNext;
@@ -450,6 +486,10 @@ void calcPower(void){
 	      buffer = power_complex(pTempR, pTempS, *(gA + (unsigned int)floor(pTempR->x) + (unsigned int)(maxWidthNow*floor(pTempR->y))), 1.5, 1.5, 2.4e9);
 	      break;
 	    }
+	    case(3):{
+	      buffer = power_urban_simple(pTempR, pTempS, *(gA + (unsigned int)floor(pTempR->x) + (unsigned int)(maxWidthNow*floor(pTempR->y))));
+	      break;
+	    }
 	    default:{
 	      (void)puts("Error, mode not suppoted.");
   	      return;
@@ -465,7 +505,11 @@ void calcPower(void){
 	  pTempR = pTempR->pNext;
         }
       
-	pTempR->SNRLin = 10.0*log10(pTempR->signal/pTempR->waste);
+        if(modelNow != 3){
+          pTempR->SNRLin = 10.0*log10(pTempR->signal/pTempR->waste);
+        }else{
+          pTempR->SNRLin = pTempR->signal - pTempR->waste;
+        } 
 	pTempR->recalc = 0;
       }
       pTempS = pTempS->pNext;
@@ -519,6 +563,8 @@ void initModel(unsigned int W, unsigned int H, unsigned int model, unsigned int 
     return;
   }
 
+  modelNow = model;
+
   probDieNow = probDie;
   probSpawnNow = probSpawn;
 
@@ -546,7 +592,6 @@ void initModel(unsigned int W, unsigned int H, unsigned int model, unsigned int 
     initGraphics();
   }
 
-  modelNow = model;
 #ifdef DEBUG
   (void)puts("Model initialised.");
 #endif
@@ -636,7 +681,12 @@ void spawnTransmitters( const unsigned int maxW, const unsigned int maxH){
   for(; pTempS; pTempS = pTempS->pNext){
     pTempS->x = ((float)rand()/(float)RAND_MAX)*maxW;
     pTempS->y = ((float)rand()/(float)RAND_MAX)*maxH;
-    pTempS->power = 1.0;
+    if(modelNow == 3){
+      pTempS->power = 30.0*((float)rand()/(float)RAND_MAX) - 50.0*((float)rand()/(float)RAND_MAX);
+    }else{
+      pTempS->power = 1;
+    }
+    pTempS->freq = 2.4e9;
   }
 
   for(; pTempR; pTempR = pTempR->pNext){
