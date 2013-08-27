@@ -18,9 +18,9 @@ const numElem numbers[10][8] = {{{1,0,5,0,LIN}, {0,1,0,9,LIN}, {1,10,5,10,LIN}, 
 			  {{0,2,0,1,LIN}, {1,0,5,0,LIN}, {6,1,6,9,LIN}, {1,10,5,10,LIN}, {0,6,0,9,LIN}, {1,5,5,5,LIN}, {0,0,0,0,END}}, /* Nine */
 			  };
 
-extern float *gA, percentY, percentX, maxWidthNow, maxHeightNow;
+extern double *gA, percentY, percentX, maxWidthNow, maxHeightNow;
 extern unsigned int nRecieversNow, nSendersNow, gASize;
-extern unsigned char lineWidth, spotSize;
+extern unsigned char lineWidth, spotSize, runningNow;
 extern RECIEVER *pRecieversNow;
 extern SENDER *pSendersNow;
 
@@ -28,7 +28,7 @@ GLFWwindow *pWView = NULL;
 
 #ifndef DEBUG
 
-inline void drawNumber(unsigned char digit, float x, float y){
+inline void drawNumber(unsigned char digit, double x, double y){
   unsigned int i = 0;
 
   if(digit > 10 || digit < 0){
@@ -61,7 +61,7 @@ inline void drawNumber(unsigned char digit, float x, float y){
   }
 }
 
-inline void printNumber(unsigned int number, float x, float y){
+inline void printNumber(unsigned int number, double x, double y){
   char buffer[32] = {""};
   unsigned int i = 0;
 
@@ -76,7 +76,7 @@ inline void printNumber(unsigned int number, float x, float y){
 
 #else
 
-void drawDigit(unsigned char digit, float x, float y){
+void drawDigit(unsigned char digit, double x, double y){
   unsigned int i = 0;
 
   if(digit > 10 || digit < 0){
@@ -111,7 +111,7 @@ void drawDigit(unsigned char digit, float x, float y){
   }
 }
 
-void printNumber(unsigned int number, float x, float y){
+void printNumber(unsigned int number, double x, double y){
   char buffer[32] = {""};
   unsigned int i = 0;
 
@@ -198,10 +198,10 @@ void render(void){
     glVertex2f(pTempS->x, pTempS->y + percentY/1.5);
     glVertex2f(pTempS->x + percentX/3.5, pTempS->y + percentY);
     
-    glVertex2f(pTempS->x,(float)pTempS->y + percentY/3.0);
-    glVertex2f((float)pTempS->x - percentX/3.0, pTempS->y);
-    glVertex2f(pTempS->x,(float)pTempS->y + percentY/3.0);
-    glVertex2f((float)pTempS->x + percentX/3.0, pTempS->y);
+    glVertex2f(pTempS->x,(double)pTempS->y + percentY/3.0);
+    glVertex2f((double)pTempS->x - percentX/3.0, pTempS->y);
+    glVertex2f(pTempS->x,(double)pTempS->y + percentY/3.0);
+    glVertex2f((double)pTempS->x + percentX/3.0, pTempS->y);
     
   }
   glEnd();
@@ -224,6 +224,7 @@ void render(void){
   }
   glEnd();
   glFinish();
+  runningNow = !glfwWindowShouldClose(pWView);
   glfwSwapBuffers(pWView);
   glfwPollEvents();
 }

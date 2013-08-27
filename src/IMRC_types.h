@@ -6,10 +6,10 @@
 #define END 0
 
 typedef struct RECIEVER{
-  float x, y; /* Position */
-  float signal; /* Total power of useful signal */
-  float waste; /* Total power of bad signals */
-  float SNRLin; /* SNR in linear scale */
+  double x, y; /* Position */
+  double signal; /* Total power of useful signal */
+  double waste; /* Total power of bad signals */
+  double SNRLin; /* SNR in linear scale */
   struct RECIEVER *pNext, *pPrev; /* Linked list */
   struct SENDER *pOwner; /* Our transmitter */
   char recalc; /* Should we re-calculate power for this reciever */
@@ -21,9 +21,9 @@ typedef struct RECIEVERS_LLIST{
 }RECIEVERS_LLIST;
 
 typedef struct SENDER{
-  float x, y; /* Position */
-  float power; /* Strength of the transmitter */
-  float freq; /* Transmitter frequency in Hz */
+  double x, y; /* Position */
+  double power; /* Strength of the transmitter */
+  double freq; /* Transmitter frequency in Hz */
   RECIEVERS_LLIST *pRecepients; /* Guys who will recieve data from us */
   unsigned int nRecepients;/* Number of recepients for this node */
   struct SENDER *pNext, *pPrev; /* Linked list */
@@ -31,15 +31,15 @@ typedef struct SENDER{
 
 /* Struct to store data how to display numbers. */
 typedef struct numElem{
-  float xs,ys,xe,ye;
+  double xs,ys,xe,ye;
   unsigned int type;
 }numElem;
 
 /* Global variables of the model and representation */
 #ifdef NOT_MAIN
-float *gA = NULL, percentY = 0.0, percentX = 0.0, maxWidthNow = 0.0, maxHeightNow = 0.0, *modRecievers = NULL, probDieNow = 0.0, probSpawnNow = 0.0;
+double *gA = NULL, percentY = 0.0, percentX = 0.0, maxWidthNow = 0.0, maxHeightNow = 0.0, *modRecievers = NULL, probDieNow = 0.0, probSpawnNow = 0.0;
 unsigned int nRecieversNow = 0, nSendersNow = 0, gASize = 0, useGraph = 0;
-unsigned char lineWidth = 1, spotSize = 2, modelNow = 1, nThreadsNow = 0, sendersChanged = 0;
+unsigned char lineWidth = 1, spotSize = 2, modelNow = 1, nThreadsNow = 0, sendersChanged = 0, runningNow = 1;
 RECIEVER *pRecieversNow = NULL;
 SENDER *pSendersNow = NULL;
 #endif

@@ -32,7 +32,7 @@ int main(int argc, char *argv[]){
   unsigned int maxHeight = DEF_HEIGHT, maxWidth = DEF_WIDTH, nRecievers = DEF_RECIEVERS, nSenders = DEF_SENDERS, nIterations = DEF_ITERATIONS, model = DEF_MODEL;
   int opt = 0, useGL = 0, fileo = 0, filei = 0, nThreads = DEF_THREADS, i = 2;
   FILE *I = NULL, *O = NULL;
-  float probSpawn = DEF_PROB_NEW, probDie = DEF_PROB_DIE;
+  double probSpawn = DEF_PROB_NEW, probDie = DEF_PROB_DIE;
 #ifdef DEBUG
   mtrace();
 #endif
