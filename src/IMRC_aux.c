@@ -1,10 +1,11 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 #define NOT_MAIN
 #include "IMRC_types.h"
 
-extern double *gA, percentY, percentX;
-extern unsigned int nRecieversNow, nSendersNow, gASize;
+extern long double *gA, percentY, percentX;
+extern unsigned int nRecieversNow, nSendersNow, gASize, randSeed;
 extern unsigned char lineWidth, spotSize;
 extern RECIEVER *pRecieversNow;
 extern SENDER *pSendersNow;
@@ -80,7 +81,7 @@ void bindToReciever(RECIEVER *pReciever, SENDER *pSender){
   pReciever->pOwner = pSender;
 
 #ifdef DEBUG
-  (void)printf("DEBUG: Successfull bind:[%lf:%lf]\n", pReciever->x, pReciever->y);
+  (void)printf("DEBUG: Successfull bind:[%Lf:%Lf]\n", pReciever->x, pReciever->y);
 #endif
 }
 
@@ -115,7 +116,7 @@ void unbindReciever(RECIEVER *pReciever){
 	pTempS->nRecepients--;
         (void)free(pTempR);
 #ifdef DEBUG
-	(void)printf("DEBUG: Successfull unbind:[%lf:%lf]\n", pReciever->x, pReciever->y);
+	(void)printf("DEBUG: Successfull unbind:[%Lf:%Lf]\n", pReciever->x, pReciever->y);
 #endif
 	return;
       }
@@ -137,7 +138,7 @@ void dumpToFile(FILE *output, unsigned int step){
   (void)fprintf(output, "%d\n", step);
 
   for(;pTempR; pTempR = pTempR->pNext, i++){
-    (void)fprintf(output, "%d\t%lf\t%lf\t%lf\n", i, pTempR->x,  pTempR->y, pTempR->SNRLin);
+    (void)fprintf(output, "%d\t%Lf\t%Lf\t%Lf\n", i, pTempR->x,  pTempR->y, pTempR->SNRLin);
   }
 #ifdef DEBUG
   (void)puts("DEBUG: Successfully written data to file.");
@@ -161,21 +162,21 @@ void readFromFile(FILE *input){
 
   pTempR->recalc = 1;
 
-  (void)fscanf(input, "%lf\t%lf\n", &(pTempR->x), &(pTempR->y));
+  (void)fscanf(input, "%Lf\t%Lf\n", &(pTempR->x), &(pTempR->y));
 
   for(i = 1; i < nRecieversNow; i++){
     pTempR->pNext = calloc(1, sizeof(RECIEVER));
     pTempR->pNext->pPrev = pTempR;
     pTempR = pTempR->pNext;
     pTempR->recalc = 1;
-    (void)fscanf(input, "%lf\t%lf\n", &(pTempR->x), &(pTempR->y));
+    (void)fscanf(input, "%Lf\t%Lf\n", &(pTempR->x), &(pTempR->y));
   }
 
   (void)fscanf(input, "%u\n", &nSendersNow);
 
   pSendersNow = pTempS = calloc( 1, sizeof(SENDER));
 
-  (void)fscanf(input, "%lf\t%lf\t%lf\t%u\t%lf\n", &(pTempS->x), &(pTempS->y), &(pTempS->power), &bind, &(pTempS->freq));
+  (void)fscanf(input, "%Lf\t%Lf\t%Lf\t%u\t%Lf\n", &(pTempS->x), &(pTempS->y), &(pTempS->power), &bind, &(pTempS->freq));
 
   bindToReciever(rcvrAtIndex(bind), pTempS);
 
@@ -183,7 +184,7 @@ void readFromFile(FILE *input){
     pTempS->pNext = calloc(1, sizeof(SENDER));
     pTempS->pNext->pPrev = pTempS;
     pTempS = pTempS->pNext;
-    (void)fscanf(input, "%lf\t%lf\t%lf\t%u\t%lf\n", &(pTempS->x), &(pTempS->y), &(pTempS->power), &bind, &(pTempS->freq));
+    (void)fscanf(input, "%Lf\t%Lf\t%Lf\t%u\t%Lf\n", &(pTempS->x), &(pTempS->y), &(pTempS->power), &bind, &(pTempS->freq));
     bindToReciever(rcvrAtIndex(bind), pTempS);
   }
 
@@ -195,12 +196,11 @@ void readFromFile(FILE *input){
 /* Initialise random number generator */
 void initRand(void){
   FILE *I = fopen("/dev/urandom", "rb");
-  int seed = 0;
-  (void)fread(&seed, 1, sizeof(int), I);
-  (void)srand(seed);
+  (void)fread(&randSeed, 1, sizeof(int), I);
+  (void)srand(randSeed);
   (void)fclose(I);
 #ifdef DEBUG
-  (void)puts("DEBUG: Random number generator initialized.");
+  (void)printf("DEBUG: Random number generator initialized, rand returned %d out of %d\n", rand(), RAND_MAX);
 #endif
 }
 

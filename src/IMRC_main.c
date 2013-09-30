@@ -24,7 +24,7 @@
 #define DEF_SENDERS 2 /* Default number of senders to spawn */
 #define DEF_RECIEVERS 2 /* Default number of recievers to spawn */
 #define DEF_MODEL 1 /* Default model type */
-#define DEF_PROB_NEW 0.9 /* Default probability of the new reciever spawn */
+#define DEF_PROB_NEW 0.8 /* Default probability of the new reciever spawn */
 #define DEF_PROB_DIE 0.1 /* Default probability of the reciever death (disconnect) */
 #define DEF_ITERATIONS 1 /* Default number of iterations */
 
@@ -32,7 +32,7 @@ int main(int argc, char *argv[]){
   unsigned int maxHeight = DEF_HEIGHT, maxWidth = DEF_WIDTH, nRecievers = DEF_RECIEVERS, nSenders = DEF_SENDERS, nIterations = DEF_ITERATIONS, model = DEF_MODEL;
   int opt = 0, useGL = 0, fileo = 0, filei = 0, nThreads = DEF_THREADS, i = 2;
   FILE *I = NULL, *O = NULL;
-  double probSpawn = DEF_PROB_NEW, probDie = DEF_PROB_DIE;
+  long double probSpawn = DEF_PROB_NEW, probDie = DEF_PROB_DIE;
 #ifdef DEBUG
   mtrace();
 #endif

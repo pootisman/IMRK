@@ -6,15 +6,20 @@
 #include "IMRC_models.h"
 #include "IMRC_aux.h"
 #include "IMRC_gl.h"
-
 #define NOT_MAIN
 #include "IMRC_types.h"
 
-#define M_PI 3.14159265358979323846264338327
+/* !!!WARNING!!! This is for simplified model of suburban ONLY! */
+#define DHM 10.5
+#define X 15.0
+#define DIST 80.0
+#define DHB 25.0
 
-extern double *gA, percentY, percentX, *modRecievers, maxWidthNow, maxHeightNow, probDieNow, probSpawnNow;
-extern unsigned int nRecieversNow, nSendersNow, gASize, useGraph;
-extern unsigned char lineWidth, spotSize, modelNow, nThreadsNow, sendersChanged, runningNow;
+/* ALSO: Remember that distance_euclid returns distance in meters. */
+extern long double *gA, percentY, percentX, *modRecievers, maxWidthNow, maxHeightNow, probDieNow, probSpawnNow;
+extern unsigned int nRecieversNow, nSendersNow, gASize, useGraph, randSeed;
+extern unsigned char lineWidth, spotSize, modelNow, sendersChanged, runningNow;
+extern char nThreadsNow;
 extern RECIEVER *pRecieversNow;
 extern SENDER *pSendersNow;
 
@@ -49,12 +54,12 @@ inline char isUseful(const RECIEVER *pReciever, const SENDER *pSender){
 }
 
 /* Gaussian distribution generator, Box-Muller method */
-inline double genGauss(void){
-  double U1 = 0.0f, U2 = 0.0f, V1 = 0.0f, V2 = 0.0f, S = 0.0f;
+inline long double genGauss(void){
+  long double U1 = 0.0f, U2 = 0.0f, V1 = 0.0f, V2 = 0.0f, S = 0.0f;
 
   do{
-    U1= fabs((double)rand()/(double)RAND_MAX);            /* U1=[0    ,1] */
-    U2= fabs((double)rand()/(double)RAND_MAX);            /* U2=[0    ,1] */
+    U1= fabs((long double)rand()/(long double)RAND_MAX);            /* U1=[0    ,1] */
+    U2= fabs((long double)rand()/(long double)RAND_MAX);            /* U2=[0    ,1] */
     V1= 2.0f * U1 - 1.0f;            /* V1=[-1,1] */
     V2= 2.0f * U2 - 1.0f;           /* V2=[-1,1] */
     S = V1 * V1 + V2 * V2;
@@ -65,8 +70,8 @@ inline double genGauss(void){
 }
 
 /* Calculate distance with Pythagoras theorem */
-inline double distance_euclid(const RECIEVER *pRecvr,const SENDER *pSender){
-  double dist = sqrt((pRecvr->x - pSender->x)*(pRecvr->x - pSender->x) + (pRecvr->y - pSender->y)*(pRecvr->y - pSender->y));
+inline long double distance_euclid(const RECIEVER *pRecvr,const SENDER *pSender){
+  long double dist = sqrt((pRecvr->x - pSender->x)*(pRecvr->x - pSender->x) + (pRecvr->y - pSender->y)*(pRecvr->y - pSender->y));
   if(dist < 1.0){
     dist = 1.0;
   }
@@ -74,30 +79,30 @@ inline double distance_euclid(const RECIEVER *pRecvr,const SENDER *pSender){
 }
 
 /* Standart model power calculation. */
-inline double power_simple(RECIEVER *pRecvr, const SENDER *pSender, const double amp){
+inline long double power_simple(RECIEVER *pRecvr, const SENDER *pSender, const long double amp){
   return ((isUseful(pRecvr, pSender)) ? (1.0) : (-1.0)) * pSender->power * (100.0)/(distance_euclid(pRecvr, pSender)*distance_euclid(pRecvr, pSender)*distance_euclid(pRecvr, pSender)*distance_euclid(pRecvr, pSender)*distance_euclid(pRecvr, pSender) + amp);
 }
 
 /* Slightly more realistic model power calculation */
-inline double power_complex(RECIEVER *pRecvr, const SENDER *pSender, const double amp, const double Ht, const double Hr, const double freq){
-  return (distance_euclid(pRecvr, pSender) == 0) ? (0) : (isUseful(pRecvr, pSender) ? (1.0) : (-1.0))*(20.0*log10(4.0*M_PI/(3e8/pSender->freq)) - 2.0 * Hr + 40.0*log10(distance_euclid(pRecvr, pSender)));
+inline long double power_complex(RECIEVER *pRecvr, const SENDER *pSender, const long double Ht, const long double Hr, const long double freq){
+  return (distance_euclid(pRecvr, pSender) == 0) ? (0) : (isUseful(pRecvr, pSender) ? (1.0) : (-1.0))*(pSender->power - 20.0*log10(4.0*M_PI/(3e8/pSender->freq)) + 2.0 * Hr - 40.0*log10(distance_euclid(pRecvr, pSender)));
 }
 
 /* Model for urban/suburban environments, simplified */
-inline double power_urban_simple(RECIEVER *pRecvr, const SENDER *pSender, const double amp){
-  return ((isUseful(pRecvr, pSender)) ? (1.0) : (-1.0)) * (pSender->power - 40.0*log10(distance_euclid(pRecvr, pSender)/1000.0) - 30.0*log10(pSender->freq/1000000.0) - 49.0 - amp);
+inline long double power_urban_simple(RECIEVER *pRecvr, const SENDER *pSender){
+  return ((isUseful(pRecvr, pSender)) ? (1.0) : (-1.0)) * (pSender->power - 40.0*(1.0 - 4.0*0.001*DHB)*log10(distance_euclid(pRecvr, pSender)/1000.0) - 21.0*log10(pSender->freq/1000000.0) - 49.0 + 18.0*log10(DHB));
 }
 
 /* Model for urban/suburban environments, complex */
-inline double power_urban_complex(RECIEVER *pRecvr, const SENDER *pSender, const double amp){
-  return ((isUseful(pRecvr, pSender) ? (1.0) : (-1.0)) * (pSender->power + 10*log10(((3e16/pSender->freq)/(4.0*M_PI*distance_euclid(pRecvr, pSender)))*((3e8/pSender->freq)/(4.0*M_PI*distance_euclid(pRecvr, pSender)))) + 10.0*log10( (3e8/(2.0*M_PI*M_PI*sqrt(/* hm^2 */ 25.0 + /* x^2 */ 49.0))) * (tan(abs(/* hm */ 5)/ /* x */7.0) - 1.0/(2.0*M_PI + pow(tan(abs(/* hm */5)/ /* x */7.0), -1.0))) * (tan(abs(/* hm */ 5)/ /* x */7.0) - 1.0/(2.0*M_PI + pow(tan(abs(/* hm */5)/ /* x */7.0), -1.0))) ) + 10.0*log10(5.52*pow((15.0/distance_euclid(pRecvr, pSender))*sqrt(20/(3e8/pSender->freq)), 1.8))  ));
+inline long double power_urban_complex(RECIEVER *pRecvr, const SENDER *pSender){
+  return ((isUseful(pRecvr, pSender) ? (1.0) : (-1.0)) * (pSender->power + 10*log10(((3e16/pSender->freq)/(4.0*M_PI*distance_euclid(pRecvr, pSender)/1000.0))*((3e8/pSender->freq)/(4.0*M_PI*distance_euclid(pRecvr, pSender)/1000.0))) + 10.0*log10( (3e8/(2.0*M_PI*M_PI*sqrt(/* hm^2 */ DHM*DHM + /* x^2 */ X*X))) * (tan(abs(/* hm */DHM)/ /* x */X) - 1.0/(2.0*M_PI + pow(tan(abs(/* hm */DHM)/ /* x */X), -1.0))) * (tan(abs(/* hm */DHM)/ /* x */X) - 1.0/(2.0*M_PI + pow(tan(abs(/* hm */DHM)/ /* x */X), -1.0))) ) + 10.0*log10(5.52*pow((DHM/distance_euclid(pRecvr, pSender)/1000.0)*sqrt(DIST/(3e8/pSender->freq)), 1.8))  ));
 }
 
 /* Function for threaded calculations */
 void *threadPowerCalc(void *args){
   THREAD_PARAMS *task = (THREAD_PARAMS *)args;
   unsigned int i = 0, j = 0;
-  double buffer = 0.0;
+  long double buffer = 0.0;
   RECIEVER *pReciever = NULL;
   SENDER *pSender = NULL;
 
@@ -118,15 +123,15 @@ void *threadPowerCalc(void *args){
             break;
 	  }
 	  case(2):{
-	    buffer = power_complex(pReciever, pSender, *(gA + (unsigned int)floor(pReciever->x) + (unsigned int)(task->W*floor(pReciever->y))), 1.5, 1.5, 2.4e9);
+	    buffer = power_complex(pReciever, pSender, 1.5, 1.5, 2.4e9);
 	    break;
 	  }
 	  case(3):{
-	    buffer = power_urban_simple(pReciever, pSender, *(gA + (unsigned int)floor(pReciever->x) + (unsigned int)(task->W*floor(pReciever->y))));
+	    buffer = power_urban_simple(pReciever, pSender);
 	    break;
 	  }
 	  case(4):{
-	    buffer = power_urban_complex(pReciever, pSender, *(gA + (unsigned int)floor(pReciever->x) + (unsigned int)(task->W*floor(pReciever->y))));
+	    buffer = power_urban_complex(pReciever, pSender);
 	    break;
 	  }
 	  default:{
@@ -157,7 +162,7 @@ void *threadPowerCalc(void *args){
 }
 
 /* Unreal mode */
-inline double *prepareSilencing(unsigned int W, unsigned int H){
+inline long double *prepareSilencing(unsigned int W, unsigned int H){
   unsigned int i = 0, j = 0;
 
   if(!W || !H){
@@ -168,13 +173,13 @@ inline double *prepareSilencing(unsigned int W, unsigned int H){
   maxWidthNow = W;
   maxHeightNow = H;
 
-  gA = calloc(W*H, sizeof(double));
+  gA = calloc(W*H, sizeof(long double));
 
   gASize = W*H;
 
   for(j = 0; j < H; j++){
     for(i = 0; i < W; i++){
-      *(gA + i + j*W) = genGauss()*6.0;
+      *(gA + i + j*W) = genGauss();
     }
   }
 
@@ -185,7 +190,7 @@ inline double *prepareSilencing(unsigned int W, unsigned int H){
 inline void calcPower(void){
   unsigned int i = 0;
   long int nThreads = 0;
-  double buffer = 0.0;
+  long double buffer = 0.0;
   pthread_t *pThreads = NULL;
   pthread_attr_t threadAttr;
   THREAD_PARAMS *pTParams = NULL;
@@ -203,31 +208,27 @@ inline void calcPower(void){
     nThreads = nThreadsNow;
   }
 
-  if(nThreads <= 0){
-    (void)puts("No multi-threading will be used.");
-  }
-
-  modRecievers = calloc(nRecieversNow, sizeof(double));
+  modRecievers = calloc(nRecieversNow, sizeof(long double));
 
   if(nThreads <= 0){
-    for(; pTempR; pTempR = pTempR->pNext ){
+    for(; pTempR; pTempR = pTempR->pNext){
       if(pTempR->recalc || sendersChanged){
-        for(; pTempS; pTempS = pTempS->pNext){
+        for( pTempS = pSendersNow; pTempS; pTempS = pTempS->pNext){
           switch(modelNow){
             case(1):{
               buffer = power_simple(pTempR, pTempS, *(gA + (unsigned int)floor(pTempR->x) + (unsigned int)(maxWidthNow*floor(pTempR->y))));
               break;
 	    }
 	    case(2):{
-	      buffer = power_complex(pTempR, pTempS, *(gA + (unsigned int)floor(pTempR->x) + (unsigned int)(maxWidthNow*floor(pTempR->y))), 1.5, 1.5, 2.4e9);
+	      buffer = power_complex(pTempR, pTempS,  1.5, 1.5, 2.4e9);
 	      break;
 	    }
 	    case(3):{
-	      buffer = power_urban_simple(pTempR, pTempS, *(gA + (unsigned int)floor(pTempR->x) + (unsigned int)(maxWidthNow*floor(pTempR->y))));
+	      buffer = power_urban_simple(pTempR, pTempS);
 	      break;
 	    }
 	    case(4):{
-	      buffer = power_urban_complex(pTempR, pTempS, *(gA + (unsigned int)floor(pTempR->x) + (unsigned int)(maxWidthNow*floor(pTempR->y))));
+	      buffer = power_urban_complex(pTempR, pTempS);
 	      break;
 	    }
 	    default:{
@@ -240,22 +241,20 @@ inline void calcPower(void){
           }else{
   	    pTempR->waste -= buffer;
           }
-
-	  pTempS = pTempS->pNext;
         }
     
         if(modelNow != 3 && modelNow != 4){
           pTempR->SNRLin = 10.0*log10(pTempR->signal/pTempR->waste);
         }else{
           pTempR->SNRLin = pTempR->signal - pTempR->waste;
-        }   
+        }  
+
 	pTempR->recalc = 0;
       }
-      pTempR = pTempR->pNext;
     }
 
     for(i = 0; i < nRecieversNow; i++){
-      *(modRecievers + i) = (double)rand()/(double)RAND_MAX;
+      *(modRecievers + i) = (long double)rand()/(long double)RAND_MAX;
     }
   }else{
     pTParams = calloc(nThreads, sizeof(THREAD_PARAMS));
@@ -280,7 +279,7 @@ inline void calcPower(void){
     }
 
     for(i = 0; i < nRecieversNow; i++){
-      *(modRecievers + i) = (double)rand()/(double)RAND_MAX;
+      *(modRecievers + i) = (long double)rand()/(long double)RAND_MAX;
     }
 
     for(i = 0; i < nThreads; i++){
@@ -316,24 +315,24 @@ char isUseful(const RECIEVER *pReciever, const SENDER *pSender){
 }
 
 /* Gaussian distribution generator, Box-Muller method */
-double genGauss(void){
-  double U1 = 0.0f, U2 = 0.0f, V1 = 0.0f, V2 = 0.0f, S = 0.0f;
+long double genGauss(void){
+  long double U1 = 0.0f, U2 = 0.0f, V1 = 0.0f, V2 = 0.0f, S = 0.0f;
 
   do{
-    U1= fabs((double)rand()/(double)RAND_MAX);            /* U1=[0    ,1] */
-    U2= fabs((double)rand()/(double)RAND_MAX);            /* U2=[0    ,1] */
+    U1= fabs((long double)rand()/(long double)RAND_MAX);            /* U1=[0    ,1] */
+    U2= fabs((long double)rand()/(long double)RAND_MAX);            /* U2=[0    ,1] */
     V1= 2.0f * U1 - 1.0f;            /* V1=[-1,1] */
     V2= 2.0f * U2 - 1.0f;           /* V2=[-1,1] */
     S = V1 * V1 + V2 * V2;
   }
   while(S >= 1.0f);
-
+  
   return sqrt(-1.0f * log(S) / S) * V1;
 }
 
 /* Calculate distance with Pythagoras theorem */
-double distance_euclid(const RECIEVER *pRecvr,const SENDER *pSender){
-  double dist = sqrt((pRecvr->x - pSender->x)*(pRecvr->x - pSender->x) + (pRecvr->y - pSender->y)*(pRecvr->y - pSender->y));
+long double distance_euclid(const RECIEVER *pRecvr,const SENDER *pSender){
+  long double dist = sqrt((pRecvr->x - pSender->x)*(pRecvr->x - pSender->x) + (pRecvr->y - pSender->y)*(pRecvr->y - pSender->y));
   if(dist < 1.0){
     dist = 1.0;
   }
@@ -344,38 +343,30 @@ double distance_euclid(const RECIEVER *pRecvr,const SENDER *pSender){
 }
 
 /* Standart model power calculation. */
-double power_simple(RECIEVER *pRecvr, const SENDER *pSender, const double amp){
+long double power_simple(RECIEVER *pRecvr, const SENDER *pSender, const long double amp){
   return ((isUseful(pRecvr, pSender)) ? (1) : (-1)) * pSender->power * (100.0)/(distance_euclid(pRecvr, pSender)*distance_euclid(pRecvr, pSender)*distance_euclid(pRecvr, pSender)*distance_euclid(pRecvr, pSender)*distance_euclid(pRecvr, pSender) + amp);
-
-  (void)puts("DEBUG: Successfully calculated signal power using simple model.");
 }
 
 /* Slightly more realistic model power calculation */
-double power_complex(RECIEVER *pRecvr, const SENDER *pSender, const double amp, const double Ht, const double Hr, const double freq){
-  return (distance_euclid(pRecvr, pSender) == 0) ? (0) : (isUseful(pRecvr, pSender) ? (1) : (-1))*(20.0*log10(4.0*M_PI/(3e8/freq)) - 2.0 * Hr + 40.0*log10(distance_euclid(pRecvr, pSender)));
-
-  (void)puts("DEBUG: Successfully calculated signal power using complex model.");
+long double power_complex(RECIEVER *pRecvr, const SENDER *pSender, const long double Ht, const long double Hr, const long double freq){
+  return (distance_euclid(pRecvr, pSender) == 0) ? (0) : (isUseful(pRecvr, pSender) ? (1) : (-1))*(pSender->power - 20.0*log10(4.0*M_PI/(3e8/freq)) + 2.0 * Hr - 40.0*log10(distance_euclid(pRecvr, pSender)));
 }
 
 /* Model for urban/suburban environments */
-double power_urban_simple(RECIEVER *pRecvr, const SENDER *pSender, const double amp){
-  return ((isUseful(pRecvr, pSender)) ? (1) : (-1)) * (pSender->power - 40.0*log10(distance_euclid(pRecvr, pSender)/1000.0) - 30.0*log10(pSender->freq/1000000.0) - 49.0 - amp);
-
- (void)puts("DEBUG: Successfully calculated signal power using urban model.");
+long double power_urban_simple(RECIEVER *pRecvr, const SENDER *pSender){
+  return ((isUseful(pRecvr, pSender)) ? (1) : (-1)) * (pSender->power - 40.0*log10(distance_euclid(pRecvr, pSender)/1000.0) - 30.0*log10(pSender->freq/1000000.0) - 49.0);
 }
 
 /* Model for urban/suburban environments, complex */
-double power_urban_complex(RECIEVER *pRecvr, const SENDER *pSender, const double amp){
-  return ((isUseful(pRecvr, pSender) ? (1.0) : (-1.0)) * (pSender->power + 10*log10(((3e16/pSender->freq)/(4.0*M_PI*distance_euclid(pRecvr, pSender)))*((3e8/pSender->freq)/(4.0*M_PI*distance_euclid(pRecvr, pSender)))) + 10.0*log10( (3e8/(2.0*M_PI*M_PI*sqrt(/* hm^2 */ 25.0 + /* x^2 */ 49.0))) * (tan(abs(/* hm */ 5)/ /* x */7.0) - 1.0/(2.0*M_PI + pow(tan(abs(/* hm */5)/ /* x */7.0), -1.0))) * (tan(abs(/* hm */ 5)/ /* x */7.0) - 1.0/(2.0*M_PI + pow(tan(abs(/* hm */5)/ /* x */7.0), -1.0))) ) + 10.0*log10(5.52*pow((15.0/distance_euclid(pRecvr, pSender))*sqrt(20/(3e8/pSender->freq)), 1.8))  ));
-
-  (void)puts("DEBUG: Successfully calculated signal power using urban model.");
+long double power_urban_complex(RECIEVER *pRecvr, const SENDER *pSender){
+  return ((isUseful(pRecvr, pSender) ? (1.0) : (-1.0)) * (pSender->power - 10*log10(((3e16/pSender->freq)/(4.0*M_PI*distance_euclid(pRecvr, pSender)))*((3e8/pSender->freq)/(4.0*M_PI*distance_euclid(pRecvr, pSender)))) + 10.0*log10( (3e8/(2.0*M_PI*M_PI*sqrt(/* hm^2 */ 25.0 + /* x^2 */ 49.0))) * (tan(abs(/* hm */ 5)/ /* x */7.0) - 1.0/(2.0*M_PI + pow(tan(abs(/* hm */5)/ /* x */7.0), -1.0))) * (tan(abs(/* hm */ 5)/ /* x */7.0) - 1.0/(2.0*M_PI + pow(tan(abs(/* hm */5)/ /* x */7.0), -1.0))) ) + 10.0*log10(5.52*pow((15.0/distance_euclid(pRecvr, pSender))*sqrt(20/(3e8/pSender->freq)), 1.8))  ));
 }
 
 /* Function for threaded calculations */
 void *threadPowerCalc(void *args){
   THREAD_PARAMS *task = (THREAD_PARAMS *)args;
   unsigned int i = 0, j = 0;
-  double buffer = 0.0;
+  long double buffer = 0.0;
   RECIEVER *pReciever = NULL;
   SENDER *pSender = NULL;
 
@@ -398,15 +389,15 @@ void *threadPowerCalc(void *args){
             break;
 	  }
 	  case(2):{
-	    buffer = power_complex(pReciever, pSender, *(gA + (unsigned int)floor(pReciever->x) + (unsigned int)(task->W*floor(pReciever->y))), 1.5, 1.5, 2.4e9);
+	    buffer = power_complex(pReciever, pSender, 1.5, 1.5, 2.4e9);
 	    break;
 	  }
 	  case(3):{
-	    buffer = power_urban_simple(pReciever, pSender, *(gA + (unsigned int)floor(pReciever->x) + (unsigned int)(task->W*floor(pReciever->y))));
+	    buffer = power_urban_simple(pReciever, pSender);
 	    break;
 	  }
 	  case(4):{
-	    buffer = power_urban_complex(pReciever, pSender, *(gA + (unsigned int)floor(pReciever->x) + (unsigned int)(task->W*floor(pReciever->y))));
+	    buffer = power_urban_complex(pReciever, pSender);
 	    break;
 	  }
 	  default:{
@@ -439,7 +430,7 @@ void *threadPowerCalc(void *args){
 }
 
 /* Unreal mode */
-double *prepareSilencing(unsigned int W, unsigned int H){
+long double *prepareSilencing(unsigned int W, unsigned int H){
   unsigned int i = 0, j = 0;
 
   if(!W || !H){
@@ -447,7 +438,7 @@ double *prepareSilencing(unsigned int W, unsigned int H){
     return NULL;
   }
 
-  gA = calloc(W*H, sizeof(double));
+  gA = calloc(W*H, sizeof(long double));
 
   maxWidthNow = W;
   maxHeightNow = H;
@@ -467,7 +458,7 @@ double *prepareSilencing(unsigned int W, unsigned int H){
 void calcPower(void){
   unsigned int i = 0;
   long int nThreads = 0;
-  double buffer = 0.0;
+  long double buffer = 0.0;
   pthread_t *pThreads = NULL;
   pthread_attr_t threadAttr;
   THREAD_PARAMS *pTParams = NULL;
@@ -487,11 +478,7 @@ void calcPower(void){
     nThreads = nThreadsNow;
   }
 
-  if(nThreads <= 0){
-    (void)puts("No multi-threading will be used.");
-  }
-
-  modRecievers = calloc(nRecieversNow, sizeof(double));
+  modRecievers = calloc(nRecieversNow, sizeof(long double));
 
   if(!modRecievers){
     (void)puts("DEBUG: Error, failed to allocate memory for modRecievers.");
@@ -500,22 +487,22 @@ void calcPower(void){
   if(nThreads <= 0){
     for(; pTempR; pTempR = pTempR->pNext ){
       if(pTempR->recalc || sendersChanged){
-        for(; pTempS; pTempS = pTempS->pNext){
+        for( pTempS = pSendersNow; pTempS; pTempS = pTempS->pNext){
           switch(modelNow){
             case(1):{
               buffer = power_simple(pTempR, pTempS, *(gA + (unsigned int)floor(pTempR->x) + (unsigned int)(maxWidthNow*floor(pTempR->y))));
               break;
 	    }
 	    case(2):{
-	      buffer = power_complex(pTempR, pTempS, *(gA + (unsigned int)floor(pTempR->x) + (unsigned int)(maxWidthNow*floor(pTempR->y))), 1.5, 1.5, 2.4e9);
+	      buffer = power_complex(pTempR, pTempS, 1.5, 1.5, 2.4e9);
 	      break;
 	    }
 	    case(3):{
-	      buffer = power_urban_simple(pTempR, pTempS, *(gA + (unsigned int)floor(pTempR->x) + (unsigned int)(maxWidthNow*floor(pTempR->y))));
+	      buffer = power_urban_simple(pTempR, pTempS);
 	      break;
 	    }
 	    case(4):{
-	      buffer = power_urban_complex(pTempR, pTempS, *(gA + (unsigned int)floor(pTempR->x) + (unsigned int)(maxWidthNow*floor(pTempR->y))));
+	      buffer = power_urban_complex(pTempR, pTempS);
 	      break;
 	    }
 	    default:{
@@ -529,8 +516,6 @@ void calcPower(void){
           }else{
 	    pTempR->waste -= buffer;
           }
-
-	  pTempR = pTempR->pNext;
         }
       
         if(modelNow != 3 && modelNow != 4){
@@ -540,11 +525,10 @@ void calcPower(void){
         } 
 	pTempR->recalc = 0;
       }
-      pTempS = pTempS->pNext;
     }
 
     for(i = 0; i < nRecieversNow; i++){
-      *(modRecievers + i) = (double)rand()/(double)RAND_MAX;
+      *(modRecievers + i) = (long double)rand()/(long double)RAND_MAX;
     }
   }else{
     pTParams = calloc(nThreads, sizeof(THREAD_PARAMS));
@@ -569,7 +553,7 @@ void calcPower(void){
     }
 
     for(i = 0; i < nRecieversNow; i++){
-      *(modRecievers + i) = (double)rand()/(double)RAND_MAX;
+      *(modRecievers + i) = (long double)rand()/(long double)RAND_MAX;
     }
 
     for(i = 0; i < nThreads; i++){
@@ -584,8 +568,7 @@ void calcPower(void){
 #endif
 
 /* Initialise model */
-void initModel(unsigned int W, unsigned int H, unsigned int model, unsigned int nRecievers, unsigned int nSenders, unsigned int nThreads, FILE *I, unsigned int useGL, double probSpawn, double probDie){
-  
+void initModel(unsigned int W, unsigned int H, unsigned int model, unsigned int nRecievers, unsigned int nSenders, unsigned int nThreads, FILE *I, unsigned int useGL, long double probSpawn, long double probDie){
   if(!W || !H || !model || !nRecievers || !nSenders){
     (void)puts("Error, can't initialize model with invalid parameters.");
     return;
@@ -595,9 +578,6 @@ void initModel(unsigned int W, unsigned int H, unsigned int model, unsigned int 
 
   probDieNow = probDie;
   probSpawnNow = probSpawn;
-
-  maxWidthNow = W;
-  maxHeightNow = H;
 
   nThreadsNow = nThreads;
 
@@ -627,9 +607,11 @@ void initModel(unsigned int W, unsigned int H, unsigned int model, unsigned int 
 
 /* Model loop */
 void modelLoop(FILE *O, unsigned int steps){
-  double genProb = 0.0f, probLim = 0.0f;
-  unsigned int step = 0, i = 0, nDeleted;
-
+  unsigned int step = 0, i = 0, nDeleted = 0;
+  long double Pr = 0.0, temp = 0.0;
+#ifdef DEBUG
+  long double M = 0.0;
+#endif
   if(!pRecieversNow){
     (void)puts("Error, got NULL in modelLoop.");
     return; 
@@ -648,12 +630,17 @@ void modelLoop(FILE *O, unsigned int steps){
         }
       }
 
-      probLim = (double)rand()/(double)RAND_MAX/2.0;
+      Pr = (long double)rand()/(long double)RAND_MAX;
 
-      for(i = 0,genProb = probSpawnNow; genProb > probLim; genProb *= genProb, i++){
-        addReciever(sndrAtIndex(rand()%nSendersNow), (double)rand()/(double)RAND_MAX*(double)maxWidthNow, (double)rand()/(double)RAND_MAX*(double)maxHeightNow);
+      for(i = 0,temp = probSpawnNow; temp > Pr; temp *= probSpawnNow){
+        ++i;
       }
-
+#ifdef DEBUG
+      M += i;
+#endif
+      for(; i > 0; i--){
+        addReciever(sndrAtIndex(rand()%nSendersNow), (long double)rand()/(long double)RAND_MAX*(long double)maxWidthNow, (long double)rand()/(long double)RAND_MAX*(long double)maxHeightNow);
+      }
 #ifdef DEBUG
       (void)printf("DEBUG: Spawned %d new recievers, there are now %d.\n", i, nRecieversNow);
 #endif
@@ -671,8 +658,11 @@ void modelLoop(FILE *O, unsigned int steps){
       (void)sleep(1);
     }
 
-    step++;
+    ++step;
   }
+#ifdef DEBUG
+  (void)printf("M = %Lf\n", (long double)M/(long double)steps);
+#endif
 }
 
 /* Create recievers within given bounds maxW, maxH */
@@ -685,8 +675,8 @@ void spawnRecievers( const unsigned int maxW, const unsigned int maxH){
   }
 
   for(; pTempR; pTempR = pTempR->pNext){
-    pTempR->x = ((double)rand()/(double)RAND_MAX)*maxW;
-    pTempR->y = ((double)rand()/(double)RAND_MAX)*maxH;
+    pTempR->x = ((long double)rand()/(long double)RAND_MAX)*maxW;
+    pTempR->y = ((long double)rand()/(long double)RAND_MAX)*maxH;
   }
 
 #ifdef DEBUG
@@ -706,10 +696,10 @@ void spawnTransmitters( const unsigned int maxW, const unsigned int maxH){
   }
 
   for(; pTempS; pTempS = pTempS->pNext){
-    pTempS->x = ((double)rand()/(double)RAND_MAX)*maxW;
-    pTempS->y = ((double)rand()/(double)RAND_MAX)*maxH;
-    if(modelNow == 3){
-      pTempS->power = 30.0*((double)rand()/(double)RAND_MAX) - 50.0*((double)rand()/(double)RAND_MAX);
+    pTempS->x = ((long double)rand()/(long double)RAND_MAX)*maxW;
+    pTempS->y = ((long double)rand()/(long double)RAND_MAX)*maxH;
+    if(modelNow > 1){
+      pTempS->power = 30.0*((long double)rand()/(long double)RAND_MAX) - 50.0*((long double)rand()/(long double)RAND_MAX);
     }else{
       pTempS->power = 1;
     }
