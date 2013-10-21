@@ -39,7 +39,7 @@ typedef struct numElem{
 #ifdef NOT_MAIN
 long double *gA = NULL, percentY = 0.0, percentX = 0.0, maxWidthNow = 0.0, maxHeightNow = 0.0, *modRecievers = NULL, probDieNow = 0.0, probSpawnNow = 0.0;
 unsigned int nRecieversNow = 0, nSendersNow = 0, gASize = 0, useGraph = 0, randSeed = 0;
-unsigned char lineWidth = 1, spotSize = 2, modelNow = 1, sendersChanged = 0, runningNow = 1;
+unsigned char lineWidth = 1, spotSize = 2, modelNow = 1, sendersChanged = 0, runningNow = 1, bindToNearest = 0;
 char nThreadsNow = 0;
 RECIEVER *pRecieversNow = NULL;
 SENDER *pSendersNow = NULL;

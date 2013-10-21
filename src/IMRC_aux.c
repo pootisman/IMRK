@@ -3,8 +3,9 @@
 #include <math.h>
 #define NOT_MAIN
 #include "IMRC_types.h"
+#include "IMRC_aux.h"
 
-extern long double *gA, percentY, percentX;
+extern long double *gA, percentY, percentX, maxWidthNow, maxHeightNow;
 extern unsigned int nRecieversNow, nSendersNow, gASize, randSeed;
 extern unsigned char lineWidth, spotSize;
 extern RECIEVER *pRecieversNow;
@@ -330,9 +331,12 @@ void addReciever(SENDER *pSender, unsigned int x, unsigned int y){
 
   ++nRecieversNow;
 
-  if(pSender){
-    pTemp->pNext->recalc = 1;
-    bindToReciever(pTemp->pNext, pSender); 
+  pTemp->pNext->recalc = 1;
+  
+  if(bindToNearest || pSender == NULL){
+     bindToReciever(pTemp->pNext, getNearest(pTemp->pNext)); 
+  }else{
+    bindToReciever(pTemp->pNext, pSender);
   }
 
 #ifdef DEBUG
@@ -369,4 +373,38 @@ void rmReciever(RECIEVER *pReciever){
 #ifdef DEBUG
   (void)puts("DEBUG: Removed reciever from list.");
 #endif
+}
+
+/* Get the nearest transmitter. */
+SENDER *getNearest(RECIEVER *pReciever){
+  unsigned int i = 0;
+  long double minDist = sqrt(maxWidthNow*maxWidthNow + maxHeightNow*maxHeightNow), dist = 0.0;
+  SENDER *pTempS = pSendersNow, *selection = NULL;
+
+  if(!pReciever){
+    (void)puts("Error, no reciever specified.");
+    return NULL;
+  }
+
+  if(!pRecieversNow || !pSendersNow){
+    (void)puts("Error, model not initialized.");
+    return NULL;
+  }
+
+  for(;i < nSendersNow; i++){
+    if((dist = sqrt((pReciever->x - pTempS->x)*(pReciever->x - pTempS->x) + (pReciever->y - pTempS->y)*(pReciever->y - pTempS->y))) < minDist){
+      selection = pTempS;
+      minDist = dist;
+    }
+    pTempS = pTempS->pNext;
+#ifdef DEBUG
+    (void)printf("Distance for %d is %Lf", i, dist);
+#endif
+  }
+
+  return selection;
+}
+
+void setConnBehaviour(unsigned char mode){
+  bindToNearest = mode;
 }

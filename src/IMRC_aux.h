@@ -3,7 +3,7 @@
 
 #include "IMRC_types.h"
 void readFromFile(FILE *input);
-void dumpToFile(const FILE *output, unsigned int step);
+void dumpToFile(FILE *output, unsigned int step);
 void initRand(void);
 RECIEVER *makeRcvrList(unsigned int nRecievers);
 SENDER *makeSndrList(unsigned int nSenders);
@@ -14,4 +14,6 @@ SENDER *sndrAtIndex( unsigned int index);
 void rmReciever(RECIEVER *pReciever);
 void bindToReciever(RECIEVER *pReciever, SENDER *pSender);
 void unbindReciever(RECIEVER *pReciever);
+SENDER *getNearest(RECIEVER *pReciever);
+void setConnBehaviour(unsigned char mode);
 #endif

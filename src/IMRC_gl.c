@@ -86,9 +86,9 @@ inline CLRVCTR calcColor(float dB){
   float a, Vdec, Hi, Rs, Gs, Bs;
   CLRVCTR result;
 
-  Hi = floor((120.0*((dB + 60.0)/120.0))/60.0);
+  Hi = floor((120.0*((dB + 70.0)/140.0))/60.0);
  
-  a = 100.0*((unsigned int)round(120.0*((dB + 60.0)/120.0))%60)/60.0;
+  a = 100.0*((unsigned int)round(120.0*((dB + 70.0)/140.0))%60)/60.0;
 
   Vdec = 100.0 - a;
 
@@ -125,6 +125,12 @@ inline CLRVCTR calcColor(float dB){
   result.R = Rs;
   result.G = Gs;
   result.B = Bs;
+
+#ifdef DEBUG
+  if(result.R == 1.0){
+    (void)printf("Bad signal %Lf with color [%f, %f, %f]", dB, Rs, Gs, Bs);
+  }
+#endif
 
   return result;
 }
@@ -186,9 +192,9 @@ CLRVCTR calcColor(float dB){
   float a, Vdec, Hi, Rs, Gs, Bs;
   CLRVCTR result;
 
-  Hi = floor((120.0*((dB + 60.0)/120.0))/60.0);
+  Hi = floor((120.0*((dB + 70.0)/140.0))/60.0);
  
-  a = 100.0*((unsigned int)round(120.0*((dB + 60.0)/120.0))%60)/60.0;
+  a = 100.0*((unsigned int)round(120.0*((dB + 70.0)/140.0))%60)/60.0;
 
   Vdec = 100.0 - a;
 

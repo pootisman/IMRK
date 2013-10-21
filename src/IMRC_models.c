@@ -18,7 +18,7 @@
 /* ALSO: Remember that distance_euclid returns distance in meters. */
 extern long double *gA, percentY, percentX, *modRecievers, maxWidthNow, maxHeightNow, probDieNow, probSpawnNow;
 extern unsigned int nRecieversNow, nSendersNow, gASize, useGraph, randSeed;
-extern unsigned char lineWidth, spotSize, modelNow, sendersChanged, runningNow;
+extern unsigned char modelNow, sendersChanged, runningNow, bindToNearest;
 extern char nThreadsNow;
 extern RECIEVER *pRecieversNow;
 extern SENDER *pSendersNow;
@@ -610,7 +610,7 @@ void modelLoop(FILE *O, unsigned int steps){
   unsigned int step = 0, i = 0, nDeleted = 0;
   long double Pr = 0.0, temp = 0.0;
 #ifdef DEBUG
-  long double M = 0.0;
+  long double Mn = 0.0, Md = 0.0;
 #endif
   if(!pRecieversNow){
     (void)puts("Error, got NULL in modelLoop.");
@@ -632,17 +632,18 @@ void modelLoop(FILE *O, unsigned int steps){
 
       Pr = (long double)rand()/(long double)RAND_MAX;
 
-      for(i = 0,temp = probSpawnNow; temp > Pr; temp *= probSpawnNow){
-        ++i;
-      }
-#ifdef DEBUG
-      M += i;
-#endif
-      for(; i > 0; i--){
-        addReciever(sndrAtIndex(rand()%nSendersNow), (long double)rand()/(long double)RAND_MAX*(long double)maxWidthNow, (long double)rand()/(long double)RAND_MAX*(long double)maxHeightNow);
+      i = 0;
+      for(temp = probSpawnNow; temp > Pr; temp *= probSpawnNow, i++){
+	if(bindToNearest){
+	  addReciever(NULL, (long double)rand()/(long double)RAND_MAX*(long double)maxWidthNow, (long double)rand()/(long double)RAND_MAX*(long double)maxHeightNow);
+	}else{
+          addReciever(sndrAtIndex(rand()%nSendersNow), (long double)rand()/(long double)RAND_MAX*(long double)maxWidthNow, (long double)rand()/(long double)RAND_MAX*(long double)maxHeightNow);
+	}
       }
 #ifdef DEBUG
       (void)printf("DEBUG: Spawned %d new recievers, there are now %d.\n", i, nRecieversNow);
+      Mn += i;
+      Md += nDeleted;
 #endif
       (void)free(modRecievers);
     }
@@ -661,7 +662,8 @@ void modelLoop(FILE *O, unsigned int steps){
     ++step;
   }
 #ifdef DEBUG
-  (void)printf("M = %Lf\n", (long double)M/(long double)steps);
+  (void)printf("Mn = %Lf, P = %Lf\n", (long double)Mn/(long double)steps, probSpawnNow);
+  (void)printf("Md = %Lf, P = %Lf\n", (long double)Md/(long double)steps, probDieNow);
 #endif
 }
 
@@ -707,8 +709,12 @@ void spawnTransmitters( const unsigned int maxW, const unsigned int maxH){
   }
 
   for(; pTempR; pTempR = pTempR->pNext){
-    j = rand()%nSendersNow;
-    bindToReciever(pTempR, sndrAtIndex(j));
+    if(bindToNearest){
+      bindToReciever(pTempR, getNearest(pTempR));
+    }else{
+      j = rand()%nSendersNow;
+      bindToReciever(pTempR, sndrAtIndex(j));
+    }
   }
 
 #ifdef DEBUG
