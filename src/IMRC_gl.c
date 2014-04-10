@@ -6,6 +6,9 @@
 #include "IMRC_gl.h"
 #include "IMRC_types.h"
 
+#define SNRMAX 160
+#define SNRADD 80
+
 /* Data for diplaying numbers. */
 const numElem numbers[10][8] = {{{1,0,5,0,LIN}, {0,1,0,9,LIN}, {1,10,5,10,LIN}, {5,1,5,9,LIN}, {0,0,0,0,END}}, /* Zero */
 			  {{0,0,6,0,LIN}, {2,1,2,10,LIN}, {2,9,0,7,LIN}, {0,0,0,0,END}}, /* One */
@@ -23,7 +26,7 @@ typedef struct CLRVCTR{
   float R,G,B;
 }CLRVCTR;
 
-extern long double *gA, percentY, percentX, maxWidthNow, maxHeightNow, maxDistNow;
+extern float *gA, percentY, percentX, maxWidthNow, maxHeightNow, maxDistNow;
 extern unsigned int nRecieversNow, nSendersNow, gASize;
 extern unsigned char lineWidth, spotSize, runningNow;
 extern RECIEVER *pRecieversNow;
@@ -34,7 +37,7 @@ GLFWwindow *pWView = NULL;
 #ifndef DEBUG
 
 /* Prints(Draws) one specified digit. */
-inline void drawNumber(unsigned char digit, long double x, long double y){
+inline void drawNumber(unsigned char digit, float x, float y){
   unsigned int i = 0;
 
   if(digit > 10 || digit < 0){
@@ -68,7 +71,7 @@ inline void drawNumber(unsigned char digit, long double x, long double y){
 }
 
 /* Prints(Draws) the whole number to openGL screen. */
-inline void printNumber(unsigned int number, long double x, long double y){
+inline void printNumber(unsigned int number, float x, float y){
   char buffer[32] = {""};
   unsigned int i = 0;
 
@@ -83,12 +86,16 @@ inline void printNumber(unsigned int number, long double x, long double y){
 
 /* Calculate color of the reciever depending on the SNR */
 inline CLRVCTR calcColor(float dB){
-  float a, Vdec, Hi, Rs, Gs, Bs;
-  CLRVCTR result;
+  float a = 0.0, Vdec = 0.0, Hi = 0.0, Rs = 0.0, Gs = 0.0, Bs = 0.0;
+  CLRVCTR result = {0.0,0.0,0.0};
 
-  Hi = floor((120.0*((dB + 70.0)/140.0))/60.0);
+  if(dB == INFINITY || dB == NAN || dB == -INFINITY){
+    dB = -SNRADD;
+  }
+
+  Hi = floor((120.0*((dB + SNRADD)/SNRMAX))/60.0);
  
-  a = 100.0*((unsigned int)round(120.0*((dB + 70.0)/140.0))%60)/60.0;
+  a = 100.0*(float)((unsigned int)floor(120.0*((dB + SNRADD)/SNRMAX))%60)/60.0;
 
   Vdec = 100.0 - a;
 
@@ -112,7 +119,7 @@ inline CLRVCTR calcColor(float dB){
     Rs = a;
     Gs = 0.0;
     Bs = 100.0;
-  }else{
+  }else if(Hi == 5.0){
     Rs = 100.0;
     Gs = 0.0;
     Bs = Vdec;
@@ -126,19 +133,13 @@ inline CLRVCTR calcColor(float dB){
   result.G = Gs;
   result.B = Bs;
 
-#ifdef DEBUG
-  if(result.R == 1.0){
-    (void)printf("Bad signal %Lf with color [%f, %f, %f]", dB, Rs, Gs, Bs);
-  }
-#endif
-
   return result;
 }
 
 #else
 
 /* Prints(Draws) one specific digit. */
-void drawDigit(unsigned char digit, long double x, long double y){
+void drawDigit(unsigned char digit, float x, float y){
   unsigned int i = 0;
 
   if(digit > 10 || digit < 0){
@@ -146,7 +147,7 @@ void drawDigit(unsigned char digit, long double x, long double y){
     return;
   }
 
-  (void)printf("DEBUG: Drawing number %d at %Lf, %Lf.\n", digit, x, y);
+  (void)printf("DEBUG: Drawing number %d at %f, %f.\n", digit, x, y);
 
   glBegin(GL_LINES);
   while(1){
@@ -174,7 +175,7 @@ void drawDigit(unsigned char digit, long double x, long double y){
 }
 
 /* Prints(Draws) the whole number to openGL screen. */
-void printNumber(unsigned int number, long double x, long double y){
+void printNumber(unsigned int number, float x, float y){
   char buffer[32] = {""};
   unsigned int i = 0;
 
@@ -189,12 +190,16 @@ void printNumber(unsigned int number, long double x, long double y){
 
 /* Calculate color of the reciever depending on the SNR */
 CLRVCTR calcColor(float dB){
-  float a, Vdec, Hi, Rs, Gs, Bs;
-  CLRVCTR result;
+  float a = 0.0, Vdec = 0.0, Hi = 0.0, Rs = 0.0, Gs = 0.0, Bs = 0.0;
+  CLRVCTR result = {0.0,0.0,0.0};
 
-  Hi = floor((120.0*((dB + 70.0)/140.0))/60.0);
+  if(dB == INFINITY || dB == NAN || dB == -INFINITY){
+    dB = -SNRADD;
+  }
+
+  Hi = floor((120.0*((dB + SNRADD)/SNRMAX))/60.0);
  
-  a = 100.0*((unsigned int)round(120.0*((dB + 70.0)/140.0))%60)/60.0;
+  a = 100.0*(float)((unsigned int)floor(120.0*((dB + SNRADD)/SNRMAX))%60)/60.0;
 
   Vdec = 100.0 - a;
 
@@ -218,7 +223,7 @@ CLRVCTR calcColor(float dB){
     Rs = a;
     Gs = 0.0;
     Bs = 100.0;
-  }else{
+  }else if(Hi == 5.0){
     Rs = 100.0;
     Gs = 0.0;
     Bs = Vdec;
@@ -232,6 +237,8 @@ CLRVCTR calcColor(float dB){
   result.G = Gs;
   result.B = Bs;
 
+  (void)printf("Signal %f with color [%f, %f, %f]\n", dB, Rs, Gs, Bs);
+
   return result;
 }
 
@@ -240,7 +247,9 @@ CLRVCTR calcColor(float dB){
 /* Render the situation */
 void render(void){
   unsigned int i = 0;
+#ifdef DEBUG
   RECIEVERS_LLIST *temp = NULL;
+#endif
   SENDER *pTempS = pSendersNow;
   RECIEVER *pTempR = pRecieversNow;
   CLRVCTR colorVect;
@@ -262,17 +271,21 @@ void render(void){
 
   pTempS = pSendersNow;
 
+#ifdef DEBUG
   for(i = 0; pTempS; pTempS = pTempS->pNext){
     printNumber(i, pTempS->x, pTempS->y);
     ++i;
   }
+#endif
 
   glBegin(GL_POINTS);
   for(i = 0; pTempR; pTempR = pTempR->pNext, i++){
     colorVect = calcColor((float)pTempR->SNRLin);
     glColor3f(colorVect.R, colorVect.G, colorVect.B);
     glVertex2f(pTempR->x, pTempR->y);
+#ifdef DEBUG
     printNumber(i, pTempR->x, pTempR->y);
+#endif
   }
   glEnd();
 
@@ -283,6 +296,7 @@ void render(void){
 
   pTempS = pSendersNow;
 
+#ifdef DEBUG
   glBegin(GL_LINES);
   for(;pTempS; pTempS = pTempS->pNext){
     temp = pTempS->pRecepients;
@@ -292,7 +306,7 @@ void render(void){
     }
   }
   glEnd();
-
+#endif
   pTempS = pSendersNow;
   pTempR = pRecieversNow;
 
@@ -307,10 +321,10 @@ void render(void){
     glVertex2f(pTempS->x, pTempS->y + percentY/1.5);
     glVertex2f(pTempS->x + percentX/3.5, pTempS->y + percentY);
     
-    glVertex2f(pTempS->x,(long double)pTempS->y + percentY/3.0);
-    glVertex2f((long double)pTempS->x - percentX/3.0, pTempS->y);
-    glVertex2f(pTempS->x,(long double)pTempS->y + percentY/3.0);
-    glVertex2f((long double)pTempS->x + percentX/3.0, pTempS->y);
+    glVertex2f(pTempS->x,(float)pTempS->y + percentY/3.0);
+    glVertex2f((float)pTempS->x - percentX/3.0, pTempS->y);
+    glVertex2f(pTempS->x,(float)pTempS->y + percentY/3.0);
+    glVertex2f((float)pTempS->x + percentX/3.0, pTempS->y);
     
   }
   glEnd();
@@ -335,11 +349,11 @@ void render(void){
   glEnd();
 
   glBegin(GL_LINES);
-  for(i = 0; i < 120; i++){
-    colorVect = calcColor(i - 60.0);
+  for(i = 0; i < SNRMAX; i++){
+    colorVect = calcColor((int)i - (int)SNRADD);
     glColor3f(colorVect.R, colorVect.G, colorVect.B);
-    glVertex2f(maxWidthNow + 0.025*maxWidthNow, (float)i/(float)120.0*maxHeightNow);
-    glVertex2f(maxWidthNow + 0.05*maxWidthNow, (float)i/(float)120.0*maxHeightNow);
+    glVertex2f(maxWidthNow + 0.025*maxWidthNow, (float)i/(float)SNRMAX*maxHeightNow);
+    glVertex2f(maxWidthNow + 0.05*maxWidthNow, (float)i/(float)SNRMAX*maxHeightNow);
   }
   glEnd();
 

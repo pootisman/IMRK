@@ -6,6 +6,7 @@
 #include "IMRC_types.h"
 #include "IMRC_gl.h"
 #include "IMRC_aux.h"
+#include "IMRC_ver.h"
 
 #ifdef DEBUG
 #include <mcheck.h>
@@ -15,25 +16,26 @@
 #define VALID_PROB(prob1, prob2) ((prob1 >= 0.0) && (prob1 <= 1.0) && (prob2 >= 0.0) && (prob2 <= 1.0) && ((prob1 + prob2) == 1))
 
 /* Help string */
-#define HELP "Help for IMRC:\n===================================\n-W maximum x coordinates.\n-H maximum y coordinates.\n-R amount of recievers to spawn.\n-S amount of transmitters to spawn.\n-F file to read graph from.\n-O file for SNR output.\n-T number of threads to run.\n-G use graphics.\n-M model selection\n-D Die probability\n-N Spawn probability\n-I Iterations to run\n-h This message\n===================================\nINFO FOR GRAPHICS MODE:\nRED - transmitter.\nYELLOW - reciever."
+#define HELP "Help for IMRC:\n===================================\n-W maximum x coordinates.\n-H maximum y coordinates.\n-R amount of recievers to spawn.\n-S amount of transmitters to spawn.\n-F file to read initial condition from.\n-O file for SNR output.\n-T number of threads to run.\n-G use graphics.\n-M model selection\n-D Die probability\n-N Spawn probability\n-I Iterations to run\n-h This message\n===================================\nINFO FOR GRAPHICS MODE:\nBLUE - BS.\n[RED..GREEN] - luser."
 
-#define VALID_ARGS "W:H:R:S:F:O:T:M:D:N:I:BGh" /* Valid arguments for the shell */
+#define VALID_ARGS "t:W:H:R:S:F:O:T:M:D:N:I:VBGh" /* Valid arguments for the shell */
 #define DEF_WIDTH 255 /* Default width of our silencing matrice */
 #define DEF_HEIGHT 255 /* Default height of our silencing matrice */
 #define DEF_THREADS 0 /* Default number of threads to use */
 #define DEF_SENDERS 2 /* Default number of senders to spawn */
 #define DEF_RECIEVERS 2 /* Default number of recievers to spawn */
 #define DEF_MODEL 1 /* Default model type */
-#define DEF_PROB_NEW 0.8 /* Default probability of the new reciever spawn */
-#define DEF_PROB_DIE 0.2 /* Default probability of the reciever death (disconnect) */
+#define DEF_PROB_NEW 0.99 /* Default probability of the new reciever spawn */
+#define DEF_PROB_DIE 0.1 /* Default probability of the reciever death (disconnect) */
 #define DEF_ITERATIONS 1 /* Default number of iterations */
+#define DEF_DELAY 500000000 /* Default delay in nanoseconds */
 
 int main(int argc, char *argv[]){
-  unsigned int maxHeight = DEF_HEIGHT, maxWidth = DEF_WIDTH, nRecievers = DEF_RECIEVERS, nSenders = DEF_SENDERS, nIterations = DEF_ITERATIONS, model = DEF_MODEL;
-  int opt = 0, useGL = 0, fileo = 0, filei = 0, nThreads = DEF_THREADS, i = 2;
+  unsigned int maxHeight = DEF_HEIGHT, maxWidth = DEF_WIDTH, nRecievers = DEF_RECIEVERS, nSenders = DEF_SENDERS, nIterations = DEF_ITERATIONS, model = DEF_MODEL, nanoDelay = DEF_DELAY;
+  int opt = 0, useGL = 0, fileo = 0, filei = 0, nThreads = DEF_THREADS, i = 1;
   FILE *I = NULL, *O = NULL;
-  long double probSpawn = DEF_PROB_NEW, probDie = DEF_PROB_DIE;
-  unsigned char nearest = 0;
+  float probSpawn = DEF_PROB_NEW, probDie = DEF_PROB_DIE;
+  unsigned short modeset = NEAR;
 #ifdef DEBUG
   mtrace();
 #endif
@@ -41,31 +43,31 @@ int main(int argc, char *argv[]){
   /* Parse program arguments. */
   while((opt = getopt(argc, argv, VALID_ARGS)) != -1){
     switch(opt){
+      case('V'):{
+        setVerMode(1);
+        break;
+      }
       case('B'):{
-	nearest = 1;
+	modeset = NEAR;
 	break;
       }
       case('D'):{
-        if(argv[i]){
-          if(!VALID_PROB(probDie, probSpawn)){
-            probDie = 1.0 - probSpawn;
-	  }
+        if(argv[i + 1]){
+	  probDie = atof(argv[i + 1]);
 	  ++i;
 	}
 	break;
       }
       case('N'):{
-      	if(argv[i]){
-	  if(!VALID_PROB(probSpawn, probDie)){
-	    probSpawn = 1.0 - probDie;
-	  }
+      	if(argv[i + 1]){
+	  probSpawn = atof(argv[i + 1]);
 	  ++i;
 	}
 	break;
       }
       case('I'):{
-	if(argv[i]){
-          nIterations = atoi(argv[i]);
+	if(argv[i + 1]){
+          nIterations = atoi(argv[i + 1]);
 	  ++i;
 	}
 	break;
@@ -75,51 +77,50 @@ int main(int argc, char *argv[]){
 	break;
       }
       case('H'):{
-        if(argv[i]){
-          maxHeight = atoi(argv[i]);
+        if(argv[i + 1]){
+          maxHeight = atoi(argv[i + 1]);
+	  ++i;
 	}
-	++i;
         break;
       }
       case('W'):{
-        if(argv[i]){
-	  maxWidth = atoi(argv[i]);
+        if(argv[i + 1]){
+	  maxWidth = atoi(argv[i + 1]);
+	  ++i;
 	}
-	++i;
 	break;
       }
       case('T'):{
-	if(argv[i]){
-	  nThreads = atoi(argv[i]);
+	if(argv[i + 1]){
+	  nThreads = atoi(argv[i + 1]);
+	  ++i;
 	}
-	++i;
 	break;
       }
       case('S'):{
-	if(argv[i]){
-	  nSenders = atoi(argv[i]);
+	if(argv[i + 1]){
+	  nSenders = atoi(argv[i + 1]);
+	  ++i;
 	}
-	++i;
 	break;
       }
       case('R'):{
-        if(argv[i]){
-	  nRecievers = atoi(argv[i]);
+        if(argv[i + 1]){
+	  nRecievers = atoi(argv[i + 1]);
+	  ++i;
 	}
-	++i;
 	break;
       }
       case('M'):{
-        if(argv[i]){
-	  model = atoi(argv[i]);
+        if(argv[i + 1]){
+	  model = atoi(argv[i + 1]);
+	  ++i;
 	}
-	++i;
 	break;
       }
       case('F'):{
-	if(argv[i]){
-	  I = fopen(argv[i], "r");
-
+	if(argv[i + 1]){
+	  I = fopen(argv[i + 1], "r");
 	  if(!I){
 	    (void)puts("Error, can't open file, terminating.");
 	    if(O){
@@ -127,14 +128,14 @@ int main(int argc, char *argv[]){
 	    }
 	    return EXIT_FAILURE;
 	  }
+	  ++i;
 	}
 	filei = 1;
-	++i;
 	break;
       }
       case('O'):{
-	if(argv[i]){
-	  O = fopen( argv[i],"w");
+	if(argv[i + 1]){
+	  O = fopen( argv[i + 1],"w");
 	  if(!O){
 	    (void)puts("Error, can't open file, terminating.");
 	    if(I){
@@ -142,9 +143,16 @@ int main(int argc, char *argv[]){
 	    }
 	    return EXIT_FAILURE;
 	  }
+	  ++i;
 	}
 	fileo = 1;
-	++i;
+	break;
+      }
+      case('t'):{
+	if(argv[i + 1]){
+	  nanoDelay = atoi(argv[i + 1]);
+	  ++i;
+	}
 	break;
       }
       case('h'):{
@@ -152,18 +160,17 @@ int main(int argc, char *argv[]){
 	return EXIT_SUCCESS;
       }
       default:{
-        (void)puts("Unknown argument.");
 	break;
       }
     }
     ++i;
   }
  
-  setConnBehaviour(nearest);
+  setConnBehaviour(modeset);
 
   initModel(maxWidth, maxHeight, model, nRecievers, nSenders, nThreads, I, useGL, probSpawn, probDie);
   
-  modelLoop(O, nIterations);
+  modelLoop(O, nIterations, nanoDelay);
 
   stopModel();
 

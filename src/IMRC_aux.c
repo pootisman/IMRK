@@ -5,7 +5,7 @@
 #include "IMRC_types.h"
 #include "IMRC_aux.h"
 
-extern long double *gA, percentY, percentX, maxWidthNow, maxHeightNow;
+extern float *gA, percentY, percentX, maxWidthNow, maxHeightNow;
 extern unsigned int nRecieversNow, nSendersNow, gASize, randSeed;
 extern unsigned char lineWidth, spotSize;
 extern RECIEVER *pRecieversNow;
@@ -80,10 +80,6 @@ void bindToReciever(RECIEVER *pReciever, SENDER *pSender){
 
   pReciever->recalc = 1;
   pReciever->pOwner = pSender;
-
-#ifdef DEBUG
-  (void)printf("DEBUG: Successfull bind:[%Lf:%Lf]\n", pReciever->x, pReciever->y);
-#endif
 }
 
 /* Unbind reciever for transmitter */
@@ -116,9 +112,6 @@ void unbindReciever(RECIEVER *pReciever){
 
 	pTempS->nRecepients--;
         (void)free(pTempR);
-#ifdef DEBUG
-	(void)printf("DEBUG: Successfull unbind:[%Lf:%Lf]\n", pReciever->x, pReciever->y);
-#endif
 	return;
       }
       pTempR = pTempR->pNext;
@@ -139,7 +132,7 @@ void dumpToFile(FILE *output, unsigned int step){
   (void)fprintf(output, "%d\n", step);
 
   for(;pTempR; pTempR = pTempR->pNext, i++){
-    (void)fprintf(output, "%d\t%Lf\t%Lf\t%Lf\n", i, pTempR->x,  pTempR->y, pTempR->SNRLin);
+    (void)fprintf(output, "%d\t%f\t%f\t%f\n", i, pTempR->x,  pTempR->y, pTempR->SNRLin);
   }
 #ifdef DEBUG
   (void)puts("DEBUG: Successfully written data to file.");
@@ -157,27 +150,42 @@ void readFromFile(FILE *input){
     return;
   }
 
-  (void)fscanf(input, "%u\n", &nRecieversNow);
+  if(!fscanf(input, "%u\n", &nRecieversNow)){
+    (void)puts("Error #1, can't read reciever data from file.");
+    return;
+  }
 
   pRecieversNow = pTempR = calloc( 1, sizeof(RECIEVER));
 
   pTempR->recalc = 1;
 
-  (void)fscanf(input, "%Lf\t%Lf\n", &(pTempR->x), &(pTempR->y));
+  if(!fscanf(input, "%f\t%f\n", &(pTempR->x), &(pTempR->y))){
+    (void)puts("Error #2, can't read reciever data from file.");
+    return;
+  }
 
   for(i = 1; i < nRecieversNow; i++){
     pTempR->pNext = calloc(1, sizeof(RECIEVER));
     pTempR->pNext->pPrev = pTempR;
     pTempR = pTempR->pNext;
     pTempR->recalc = 1;
-    (void)fscanf(input, "%Lf\t%Lf\n", &(pTempR->x), &(pTempR->y));
+    if(!fscanf(input, "%f\t%f\n", &(pTempR->x), &(pTempR->y))){
+      (void)puts("Error #3, can't read reciever data from file.");
+      return;
+    }
   }
 
-  (void)fscanf(input, "%u\n", &nSendersNow);
+  if(!fscanf(input, "%u\n", &nSendersNow)){
+    (void)puts("Error #1, can't read sender data from file.");
+    return;
+  }
 
   pSendersNow = pTempS = calloc( 1, sizeof(SENDER));
 
-  (void)fscanf(input, "%Lf\t%Lf\t%Lf\t%u\t%Lf\n", &(pTempS->x), &(pTempS->y), &(pTempS->power), &bind, &(pTempS->freq));
+  if(!fscanf(input, "%f\t%f\t%f\t%u\t%f\n", &(pTempS->x), &(pTempS->y), &(pTempS->power), &bind, &(pTempS->freq))){
+    (void)puts("Error #2, can't read sender data from file.");
+    return;
+  }
 
   bindToReciever(rcvrAtIndex(bind), pTempS);
 
@@ -185,7 +193,10 @@ void readFromFile(FILE *input){
     pTempS->pNext = calloc(1, sizeof(SENDER));
     pTempS->pNext->pPrev = pTempS;
     pTempS = pTempS->pNext;
-    (void)fscanf(input, "%Lf\t%Lf\t%Lf\t%u\t%Lf\n", &(pTempS->x), &(pTempS->y), &(pTempS->power), &bind, &(pTempS->freq));
+    if(!fscanf(input, "%f\t%f\t%f\t%u\t%f\n", &(pTempS->x), &(pTempS->y), &(pTempS->power), &bind, &(pTempS->freq))){
+      (void)puts("Error #3, can't read sender data from file.");
+      return;
+    }
     bindToReciever(rcvrAtIndex(bind), pTempS);
   }
 
@@ -197,7 +208,14 @@ void readFromFile(FILE *input){
 /* Initialise random number generator */
 void initRand(void){
   FILE *I = fopen("/dev/urandom", "rb");
-  (void)fread(&randSeed, 1, sizeof(int), I);
+  if(!I){
+    (void)puts("Error, no /dev/urandom?");
+    return;
+  }
+  if(!fread(&randSeed, 1, sizeof(int), I)){
+    (void)puts("Error, failed to init generator.");
+    return;
+  }
   (void)srand(randSeed);
   (void)fclose(I);
 #ifdef DEBUG
@@ -329,19 +347,18 @@ void addReciever(SENDER *pSender, unsigned int x, unsigned int y){
   pTemp->pNext->x = x;
   pTemp->pNext->y = y;
 
-  ++nRecieversNow;
+  nRecieversNow++;
 
   pTemp->pNext->recalc = 1;
   
-  if(bindToNearest || pSender == NULL){
+  if(bindMode == NEAR || pSender == NULL){
      bindToReciever(pTemp->pNext, getNearest(pTemp->pNext)); 
-  }else{
+  }else if(bindMode == RAND){
     bindToReciever(pTemp->pNext, pSender);
+  }else if(bindMode == MAXS){
+
   }
 
-#ifdef DEBUG
-  (void)puts("DEBUG: Added new reciever to list.");
-#endif
 }
 
 /* Remove the reciever from the list */
@@ -367,19 +384,16 @@ void rmReciever(RECIEVER *pReciever){
     unbindReciever(pReciever);
   }
   
-  --nRecieversNow;
+  nRecieversNow--;
   (void)free(pReciever);
 
-#ifdef DEBUG
-  (void)puts("DEBUG: Removed reciever from list.");
-#endif
 }
 
 /* Get the nearest transmitter. */
 SENDER *getNearest(RECIEVER *pReciever){
   unsigned int i = 0;
-  long double minDist = sqrt(maxWidthNow*maxWidthNow + maxHeightNow*maxHeightNow), dist = 0.0;
-  SENDER *pTempS = pSendersNow, *selection = NULL;
+  float minDist = sqrt(maxWidthNow*maxWidthNow + maxHeightNow*maxHeightNow), dist = 0.0;
+  SENDER *pTempS = pSendersNow, *pSelection = NULL;
 
   if(!pReciever){
     (void)puts("Error, no reciever specified.");
@@ -391,20 +405,37 @@ SENDER *getNearest(RECIEVER *pReciever){
     return NULL;
   }
 
-  for(;i < nSendersNow; i++){
+  for(i = 0;i < nSendersNow; i++){
     if((dist = sqrt((pReciever->x - pTempS->x)*(pReciever->x - pTempS->x) + (pReciever->y - pTempS->y)*(pReciever->y - pTempS->y))) < minDist){
-      selection = pTempS;
+      pSelection = pTempS;
       minDist = dist;
     }
     pTempS = pTempS->pNext;
-#ifdef DEBUG
-    (void)printf("Distance for %d is %Lf", i, dist);
-#endif
   }
 
-  return selection;
+  return pSelection;
 }
+/*
+SENDER *getMaxSig(RECIEVER *pReciever){
+  unsigned int i = 0;
+  float minSig = -INFINITY;
+  SENDER *pTempS = pSendersNow, *pSelection = NULL;
 
+  if(!pReciever){
+    (void)puts("Error, no reciever specified.");
+    return NULL;
+  }
+
+  if(!pRecieversNow || !pSendersNow){
+    (void)puts("Error, model now initialized.");
+    return NULL;
+  }
+
+  for(i = 0; i < nSendersNow; i++){
+
+  }
+}
+*/
 void setConnBehaviour(unsigned char mode){
-  bindToNearest = mode;
+  bindMode = mode;
 }

@@ -5,8 +5,8 @@
 
 void spawnTransmitters(const unsigned int maxW, const unsigned int maxH);
 void spawnRecievers(const unsigned int maxW, const unsigned int maxH);
-long double *prepareSilencing(unsigned int W, unsigned int H);
+float *prepareSilencing(unsigned int W, unsigned int H);
 void stopModel(void);
-void modelLoop(FILE *O, unsigned int steps);
-void initModel(unsigned int W, unsigned int H, unsigned int model, unsigned int nRecievers, unsigned int nSenders, unsigned int nThreads, FILE *I, unsigned int useGL, long double probSpawn, long double probDie);
+void modelLoop(FILE *O, unsigned int steps, unsigned int nanoDelay);
+void initModel(unsigned int W, unsigned int H, unsigned int model, unsigned int nRecievers, unsigned int nSenders, unsigned int nThreads, FILE *I, unsigned int useGL, float probSpawn, float probDie);
 #endif
