@@ -10,6 +10,7 @@
 #include "IMRC_aux.h"
 #include "IMRC_gl.h"
 #include "IMRC_ver.h"
+#include "IMRC_pretty_output.h"
 #define NOT_MAIN
 #include "IMRC_types.h"
 
@@ -31,25 +32,28 @@ typedef struct{
 #ifdef DEBUG
   float avgSNR;
 #endif
-  unsigned int nSenders;
   unsigned int steps;
   unsigned int W;
   unsigned int model;
   unsigned int threadNum;
-  RECIEVER *pRecvrs;
-  SENDER *pSenders;
 }THREAD_PARAMS;
 
 /* Global model parameters */
-unsigned char *pUnlocked = NULL;
+unsigned char *pThreadBeginCheck = NULL, *pThreadFinishedCheck = NULL, *pMainReadyCheck = NULL, startedListen = 0, *pThreadExited = NULL;
 unsigned int shutdown = 0, firstRun = 1;/* Running for the first time, should we stop now?  */
-/*pthread_attr_t threadAttr; Thread attributes, will be removed soon */
-pthread_cond_t *pThreadConds; /* Condition variables for threads, signalled when they finished */
-pthread_cond_t mainCond; /* Main condition variable, all theads will wait on it */
-pthread_mutex_t *pThreadMutexes = NULL; /* Mutexes for threads, I dunno */
-pthread_mutex_t *pMainMutexes = NULL;
-pthread_t *pThreads = NULL; /* Thread pointers */
-THREAD_PARAMS *pParams = NULL; /* Thread parameters, change drastically during run */
+pthread_mutex_t pStartThread = PTHREAD_MUTEX_INITIALIZER; /* Mutex for starting thread. */
+
+pthread_mutex_t *pThreadBeginMutexes = NULL;
+pthread_mutex_t *pThreadFinishedMutexes = NULL;
+pthread_mutex_t *pMainReadyMutexes = NULL;
+
+pthread_cond_t *pThreadBeginConditions = NULL; /* Condition variable for starting child threads. */
+pthread_cond_t *pThreadFinishedConditions = NULL; /* Condition for thread to continue. */
+pthread_cond_t *pMainReadyConditions = NULL; /* Condition if thread finished calculations, used by parent. */
+
+pthread_t *pThreads = NULL;
+
+THREAD_PARAMS *pParams = NULL; /* Thread parameters, change drastically during run. */
 
 /* Declare the function before actual use to prevent blahblah undeclared errors */
 void *threadPowerCalc(void *args);
@@ -59,21 +63,29 @@ void *threadPowerCalc(void *args);
 inline
 #endif
 void initThreads(unsigned int nThrds){
-#ifdef DEBUG
-  (void)printf("DEBUG: Trying to create %d threads.\n", nThrds);
-#endif
+  printd("Trying to create threads", __FILE__, __LINE__);
   firstRun = 1;
   shutdown = 0;
   if(nThreadsNow == 0){
     pThreads = calloc(nThrds, sizeof(pthread_t));
     pParams = calloc(nThrds, sizeof(THREAD_PARAMS));
-    pThreadConds = calloc(nThrds, sizeof(pthread_cond_t));
-    pMainMutexes = calloc(nThrds, sizeof(pthread_mutex_t));
-    pThreadMutexes = calloc(nThrds, sizeof(pthread_mutex_t));
-    pUnlocked = calloc(nThrds, sizeof(unsigned char));
+
+    pThreadBeginConditions = calloc(nThrds, sizeof(pthread_cond_t));
+    pThreadFinishedConditions = calloc(nThrds, sizeof(pthread_cond_t));
+    pMainReadyConditions = calloc(nThrds, sizeof(pthread_cond_t));
+
+    pThreadBeginMutexes = calloc(nThrds, sizeof(pthread_mutex_t));
+    pThreadFinishedMutexes = calloc(nThrds, sizeof(pthread_mutex_t));
+    pMainReadyMutexes = calloc(nThrds, sizeof(pthread_mutex_t));
+    
+    pThreadBeginCheck = calloc(nThrds, sizeof(unsigned char));
+    pThreadFinishedCheck = calloc(nThrds, sizeof(unsigned char));
+    pMainReadyCheck = calloc(nThrds, sizeof(unsigned char));
+    pThreadExited = calloc(nThrds, sizeof(unsigned char));
+
     nThreadsNow = nThrds;
   }else{
-    (void)puts("Not creating any new threads, delete old first!");
+    printw("Not creating any new threads, delete old first", __FILE__, __LINE__);
   }
 }
 
@@ -83,15 +95,11 @@ inline
 #endif
 void contThreads(void){
   unsigned int i = 0;
-  for(;i < nThreadsNow; i++){
-    while(*(pUnlocked + i) == 0){
-      pthread_cond_broadcast(&mainCond);
-      (void)usleep(20);
-    }
+  printd("Continuing threads", __FILE__, __LINE__);
+  for(i = 0; i < nThreadsNow; i++){
+    (void)pthread_cond_signal(pMainReadyConditions + i);
+    *(pMainReadyCheck + i) = 1;
   }
-#ifdef DEBUG
-  (void)puts("DEBUG: Continuing threads.");
-#endif
 }
 
 /* Start all threads, call this ONCE. */
@@ -108,26 +116,28 @@ void startThreads(void){
   firstRun = 0;
 
   if(nThreadsNow == 0 || pThreads == NULL || pParams == NULL){
-    (void)puts("Error, initialize threads first, then start them.");
+    printe("Initialize threads first, then start them", __FILE__, __LINE__);
     return;
   }
 
-  (void)pthread_cond_init(&mainCond, NULL);
-
-  for(;i < nThreadsNow; i++){
-    (void)pthread_cond_init(pThreadConds + i, NULL);
-    (void)pthread_cond_init(&mainCond, NULL);
-    (void)pthread_mutex_init(pThreadMutexes + i, NULL);
-    (void)pthread_mutex_init(pMainMutexes + i, NULL);
+  for(i = 0; i < nThreadsNow; i++){
+    (void)pthread_cond_init(pThreadFinishedConditions + i, NULL);
+    (void)pthread_cond_init(pThreadBeginConditions + i, NULL);
+    (void)pthread_cond_init(pMainReadyConditions + i, NULL);
+    (void)pthread_mutex_init(pThreadFinishedMutexes + i, NULL);
+    (void)pthread_mutex_init(pThreadBeginMutexes + i, NULL);
+    (void)pthread_mutex_init(pMainReadyMutexes + i, NULL);
     (pParams + i)->threadNum = i;
+    *(pThreadFinishedCheck + i) = 0;
+    *(pThreadBeginCheck + i) = 0;
+    *(pMainReadyCheck + i) = 0;
+    *(pThreadExited + i) = 0;
     if(pthread_create(pThreads + i, NULL, threadPowerCalc, pParams + i) != 0){
-      (void)puts("Warning, failed to create thread, retrying");
+      printw("Failed to create thread, retrying", __FILE__, __LINE__);
       i--;
     }
   }
-#ifdef DEBUG
-  (void)puts("DEBUG: Started threads.");
-#endif
+  printd("Started threads.", __FILE__, __LINE__);
 }
 
 /* Load thread parameters in. */
@@ -136,26 +146,18 @@ inline
 #endif
 void loadParams(THREAD_PARAMS *pParms, unsigned char threadNumber){
   if(!pParms){
-    (void)puts("Error, recieved NULL in loadParams.");
-    return;
-  }
-
-  if(!pParms->pSenders || !pParms->pRecvrs){
-    (void)puts("Error, recieved NULL in loadParams struct.");
+    printe("Recieved NULL in loadParams.", __FILE__, __LINE__);
     return;
   }
 
   if(threadNumber >= nThreadsNow || threadNumber < 0){
-    (void)puts("Error, invalid thread index provided.");
+    printe("Invalid thread index provided.", __FILE__, __LINE__);
     return;
   }
 
-  (pParams + threadNumber)->pSenders = pParms->pSenders;
-  (pParams + threadNumber)->pRecvrs = pParms->pRecvrs;
   (pParams + threadNumber)->W = pParms->W;
   (pParams + threadNumber)->steps = pParms->steps;
   (pParams + threadNumber)->model = pParms->model;
-  (pParams + threadNumber)->nSenders = pParms->nSenders;
 }
 
 /* Free threads and parameters */
@@ -163,21 +165,41 @@ void loadParams(THREAD_PARAMS *pParms, unsigned char threadNumber){
 inline
 #endif
 void freeThreads(void){
+  unsigned int i = 0;
+
   if(pThreads == NULL || nThreadsNow == 0){
-    (void)puts("Error, there are no threads to free.");
+    printe("There are no threads to free.", __FILE__, __LINE__);
     return;
   }
 
-  (void)free(pUnlocked);
-  (void)free(pMainMutexes);
-  (void)free(pThreadMutexes);
-  (void)free(pThreadConds);
+  shutdown = 1;
+
+  (void)contThreads();
+
+  for(i = 0; i < nThreadsNow; i++){
+    if(*(pThreadExited + i)){
+      (void)pthread_join(*(pThreads + i), NULL);
+    }
+  }
+
+  (void)free(pThreadFinishedCheck);
+  (void)free(pThreadBeginCheck);
+  (void)free(pMainReadyCheck);
+  (void)free(pThreadExited);
+
+  (void)free(pThreadFinishedMutexes);
+  (void)free(pThreadBeginMutexes);
+  (void)free(pMainReadyMutexes);
+  
+  (void)free(pThreadFinishedConditions);
+  (void)free(pThreadBeginConditions);
+  (void)free(pMainReadyConditions);
+
   (void)free(pThreads);
   (void)free(pParams);
   nThreadsNow = 0;
-#ifdef DEBUG
-  (void)puts("DEBUG: All threads freed successfully.");
-#endif
+
+  printd("All threads freed successfully", __FILE__, __LINE__);
 }
 
 /* Check whether we transmit data to the pReciever or not */
@@ -188,7 +210,7 @@ char isUseful(const RECIEVER *pReciever, const SENDER *pSender){
   RECIEVERS_LLIST *pTempR = NULL;
 
   if(!pReciever || !pSender){
-    (void)puts("Error, recieved NULL in isUseful.");
+    printe("Recieved NULL in isUseful", __FILE__, __LINE__);
     return -1;
   }
 
@@ -208,22 +230,26 @@ inline
 void waitForThreads(){
   unsigned int i = 0;
 
-#ifdef DEBUG
-  (void)puts("DEBUG: Waiting for threads.");
-#endif
+  printd("Waiting for threads", __FILE__, __LINE__);
 
-  for(;i < nThreadsNow; i++){
-    (void)pthread_mutex_lock(pThreadMutexes + i);
-    (void)pthread_cond_wait((pThreadConds + i), (pThreadMutexes + i));
-#ifdef DEBUG
-    (void)puts("DEBUG: Thread signalled.");
-#endif
-    *(pUnlocked + i) = 0;
-    (void)pthread_mutex_unlock(pThreadMutexes + i);
+  /* Inform threads that we are ready to wait. */
+  for(i = 0; i < nThreadsNow; i++){
+    (void)pthread_cond_signal(pThreadBeginConditions + i);
+    *(pThreadBeginCheck + i) = 1;
   }
-#ifdef DEBUG
-  (void)puts("DEBUG: Threads are done, continuing.");
-#endif
+
+  for(i = 0; i < nThreadsNow; i++){
+    if(*(pThreadFinishedCheck + i) == 0){
+      (void)pthread_mutex_lock(pThreadFinishedMutexes + i);
+      (void)pthread_cond_wait(pThreadFinishedConditions + i, pThreadFinishedMutexes + i);
+      (void)pthread_mutex_unlock(pThreadFinishedMutexes + i);
+    }
+
+    *(pThreadFinishedCheck + i) = 0;
+
+    printd("Parent thread notified", __FILE__, __LINE__);
+  }
+  printd("Threads are done, continuing", __FILE__, __LINE__);
 }
 
 /* Check whether the user is within the sector */
@@ -234,22 +260,18 @@ char isInView(SENDER *pOrigin, float startDegs, float stopDegs, RECIEVER *pUser)
   float angle = 0.0;
 
   if(!pOrigin || !pUser){
-    (void)printf("Error, recieved NULL in isInView.");
+    printe("Recieved NULL in isInView.", __FILE__, __LINE__);
     return -1;
   }
 
   angle = atan((pOrigin->x - pUser->x)/(pOrigin->y - pUser->y));
 
   if(angle > startDegs && angle < stopDegs){
-#ifdef DEBUG
-    (void)puts("DEBUG: Location in sector.");
-#endif
+    printe("Location in sector", __FILE__, __LINE__);
     return 1;
   }
 
-#ifdef DEBUG
-  (void)puts("DEBUG: Location out of sector.");
-#endif
+  printd("Location out of sector", __FILE__, __LINE__);
 
   return 0;
 }
@@ -327,19 +349,30 @@ void *threadPowerCalc(void *args){
   SENDER *pSender = NULL;
 
   if(args == NULL){
-    (void)puts("Error, NULL passed to thread.");
+    printet("NULL passed to thread", __FILE__, __LINE__, task->threadNum);
     (void)pthread_exit(NULL);
   }
 
   task = (THREAD_PARAMS *)args;
 
   while(shutdown == 0){
-    pReciever = task->pRecvrs;
 
-    for(i = 0; i < task->steps; i++){
+    if(*(pThreadBeginCheck + task->threadNum) == 0){
+     printdt("Thread waiting for start signal", __FILE__, __LINE__, task->threadNum);
+     (void)pthread_mutex_lock(pThreadBeginMutexes + task->threadNum);
+     (void)pthread_cond_wait(pThreadBeginConditions + task->threadNum, pThreadBeginMutexes + task->threadNum);
+     (void)pthread_mutex_unlock(pThreadBeginMutexes + task->threadNum);
+    }
+
+    *(pThreadBeginCheck + task->threadNum) = 0;
+
+    printdt("Thread recieved start signal", __FILE__, __LINE__, task->threadNum);
+    pReciever = rcvrAtIndex(task->threadNum);
+    for(i = 0; i < task->steps && pReciever != NULL; i++){
+      pReciever = rcvrAtIndex(task->threadNum + i * task->threadNum);
       if(pReciever->recalc || sendersChanged){
-        pSender = task->pSenders;
-        for(j = 0; j < task->nSenders; j++){
+        pSender = pSendersNow;
+        for(j = 0; j < nSendersNow; j++){
           switch(task->model){
             case(1):{
               buffer = power_simple(pReciever, pSender, *(gA + (unsigned int)floor(pReciever->x) + (unsigned int)(task->W*floor(pReciever->y))));
@@ -358,7 +391,7 @@ void *threadPowerCalc(void *args){
 	      break;
 	    }
 	    default:{
-	      (void)puts("Error, mode not suppoted.");
+	      printet("Mode not suppoted", __FILE__, __LINE__, task->threadNum);
 	      pthread_exit(NULL); 
 	    }
           }
@@ -378,25 +411,25 @@ void *threadPowerCalc(void *args){
         }
         pReciever->recalc = 0;
       }
-      pReciever = pReciever->pNext;
     }
 
-    (void)pthread_mutex_lock(pMainMutexes + task->threadNum);
-    *(pUnlocked + task->threadNum) = 1;
-    do{
-      (void)usleep(20);
-      (void)pthread_cond_signal(pThreadConds + task->threadNum);
-    }while(*(pUnlocked + task->threadNum) == 1);
+    printdt("Thread finished calculations, notifying parent", __FILE__, __LINE__, task->threadNum);
+    (void)pthread_cond_signal(pThreadFinishedConditions + task->threadNum);
+    *(pThreadFinishedCheck + task->threadNum) = 1;
+    
+    if(*(pMainReadyCheck + task->threadNum) == 0){
+      printdt("Waiting for parent to finish it's job", __FILE__, __LINE__, task->threadNum);
+      (void)pthread_mutex_lock(pMainReadyMutexes + task->threadNum);
+      (void)pthread_cond_wait(pMainReadyConditions + task->threadNum, pMainReadyMutexes + task->threadNum);
+      (void)pthread_mutex_unlock(pMainReadyMutexes + task->threadNum);
+    }
 
-    (void)pthread_cond_wait(&mainCond, pMainMutexes + task->threadNum);
+    *(pMainReadyCheck + task->threadNum) = 0;
 
-    *(pUnlocked + task->threadNum) = 1;
-#ifdef DEBUG
-    (void)puts("Main thread is done, resuming.");
-#endif
-    (void)pthread_mutex_unlock(pMainMutexes + task->threadNum);
+    printdt("Parent finished, continuing", __FILE__, __LINE__, task->threadNum);
   }
 
+  *(pThreadExited + task->threadNum) = 1;
   (void)pthread_exit(NULL);
 }
 
@@ -407,8 +440,8 @@ inline
 float *prepareSilencing(unsigned int W, unsigned int H){
   unsigned int i = 0, j = 0;
 
-  if(!W || !H){
-    (void)puts("Error, can't initialize 0x0 field.");
+  if(W == 0 || H == 0){
+    printe("Can't initialize 0x0 field", __FILE__, __LINE__);
     return NULL;
   }
 
@@ -437,7 +470,7 @@ void calcPower(void){
   THREAD_PARAMS threadParameters;
 
   if(!pRecieversNow || !pSendersNow){
-    (void)puts("Error, NULL provided!");
+    printe("NULL provided", __FILE__, __LINE__);
     return;
   }
 
@@ -448,11 +481,8 @@ void calcPower(void){
   modRecievers = calloc(nRecieversNow, sizeof(float));
 
   /* Prepare tasks for threads */
-  for(; i < nThreadsNow; i++){
+  for(i = 0; i < nThreadsNow; i++){
     threadParameters.steps = (i < nThreadsNow - 1) ? (round(nRecieversNow/nThreadsNow)) : (nRecieversNow - accumBuffer);
-    threadParameters.pSenders = pSendersNow;
-    threadParameters.pRecvrs = (i < nThreadsNow - 1) ? (rcvrAtIndex(i*round(nRecieversNow/nThreadsNow))) : (rcvrAtIndex(nRecieversNow - accumBuffer));
-    threadParameters.nSenders = nSendersNow;
     threadParameters.model = modelNow;
     threadParameters.W = maxWidthNow;
     loadParams(&threadParameters, i);
@@ -476,9 +506,11 @@ void calcPower(void){
 /* Initialise model */
 void initModel(unsigned int W, unsigned int H, unsigned int model, unsigned int nRecievers, unsigned int nSenders, unsigned int nThreads, FILE *I, unsigned int useGL, float probSpawn, float probDie){
   if(!W || !H || !model || !nRecievers || !nSenders){
-    (void)puts("Error, can't initialize model with invalid parameters.");
+    printe("Can't initialize model with invalid parameters", __FILE__, __LINE__);
     return;
   }
+
+  initStart();
 
   modelNow = model;
 
@@ -510,9 +542,7 @@ void initModel(unsigned int W, unsigned int H, unsigned int model, unsigned int 
     initGraphics();
   }
 
-#ifdef DEBUG
-  (void)puts("Model initialised.");
-#endif
+  printd("Model initialised", __FILE__, __LINE__);
 }
 
 /* Model loop */
@@ -520,16 +550,12 @@ void modelLoop(FILE *O, unsigned int steps, unsigned int nanoDelay){
   unsigned int step = 0, i = 0, nDeleted = 0;
   float Pr = 0.0, temp = 0.0;
   struct timespec tSpec;
-#ifdef DEBUG
-  float Mn = 0.0, Md = 0.0;
-  FILE *Od = fopen("SNR_avg.dat","w");
-#endif
 
   tSpec.tv_sec = 0;
   tSpec.tv_nsec = nanoDelay;
 
   if(!pRecieversNow){
-    (void)puts("Error, got NULL in modelLoop.");
+    printe("Got NULL in modelLoop", __FILE__, __LINE__);
     return; 
   }
 
@@ -553,15 +579,18 @@ void modelLoop(FILE *O, unsigned int steps, unsigned int nanoDelay){
           addReciever(sndrAtIndex(rand()%nSendersNow), (float)rand()/(float)RAND_MAX*(float)maxWidthNow, (float)rand()/(float)RAND_MAX*(float)maxHeightNow);
 	}
       }
+/*
 #ifdef DEBUG
       (void)printf("DEBUG: Spawned %d new recievers, there are now %d.\n", i, nRecieversNow);
       Mn += i;
       Md += nDeleted;
 #endif
+*/
     }
 
     calcPower();
-
+    (void)printf("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$[STEP: %d]\n", step);
+    (void)fflush(stdout);
     if(O && steps > 0){
       dumpToFile(O, step);
     }
@@ -577,11 +606,12 @@ void modelLoop(FILE *O, unsigned int steps, unsigned int nanoDelay){
 
     ++step;
   }
+/* 
 #ifdef DEBUG
-  (void)printf("Mn = %f, P = %f\n", (float)Mn/(float)steps, probSpawnNow);
+(void)printf("Mn = %f, P = %f\n", (float)Mn/(float)steps, probSpawnNow);
   (void)printf("Md = %f, P = %f\n", (float)Md/(float)steps, probDieNow);
   (void)fclose(Od);
-#endif
+#endif*/
   stopVerr();
 }
 
@@ -590,7 +620,7 @@ void spawnRecievers( const unsigned int maxW, const unsigned int maxH){
   RECIEVER *pTempR = pRecieversNow;
 
   if(!pRecieversNow || nRecieversNow == 0 || maxW == 0 || maxH == 0){
-    (void)puts("Error, can't spawn recievers.");
+    printe("Can't spawn recievers", __FILE__, __LINE__);
     return;
   }
 
@@ -599,9 +629,7 @@ void spawnRecievers( const unsigned int maxW, const unsigned int maxH){
     pTempR->y = ((float)rand()/(float)RAND_MAX)*maxH;
   }
 
-#ifdef DEBUG
-  (void)puts("DEBUG: Spawned recievers.");
-#endif
+  printd("Spawned recievers", __FILE__, __LINE__);
 }
 
 /* Create transmitters within given bounds maxW,maxH and bind recievers to them */
@@ -611,7 +639,7 @@ void spawnTransmitters( const unsigned int maxW, const unsigned int maxH){
   RECIEVER *pTempR = pRecieversNow;
 
   if(!pRecieversNow || !pSendersNow || nRecieversNow == 0 || nSendersNow == 0 || maxW == 0 || maxH == 0){
-    (void)puts("Error, can't spawn transmitters.");
+    printe("Can't spawn transmitters", __FILE__, __LINE__);
     return;
   }
 
@@ -639,9 +667,7 @@ void spawnTransmitters( const unsigned int maxW, const unsigned int maxH){
     }
   }
 
-#ifdef DEBUG
-  (void)puts("DEBUG: Spawned transmitters.");
-#endif
+  printd("Spawned transmitters", __FILE__, __LINE__);
 }
 
 /* Free allocated memory */
@@ -650,7 +676,7 @@ void stopModel(void){
   SENDER *pTempS = pSendersNow;
 
   if(!gA || !pTempS || !pRecieversNow){
-    (void)puts("Error, failed to stop model, not running.");
+    printe("Failed to stop model, not running", __FILE__, __LINE__);
     return;
   }
 
@@ -673,7 +699,5 @@ void stopModel(void){
   (void)freeLists();
   (void)freeThreads();
   (void)free(modRecievers);
-#ifdef DEBUG
-  (void)puts("DEBUG: Stopped model.");
-#endif
+  printd("Stopped model", __FILE__, __LINE__);
 }

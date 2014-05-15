@@ -12,6 +12,9 @@
 #define SNDR "S"
 #define RCVR "R"
 
+#define TRUE 0xFF
+#define FALSE 0x00
+
 typedef struct RECIEVER{
   float x, y; /* Position */
   float signal; /* Total power of useful signal */

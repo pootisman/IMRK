@@ -16,7 +16,7 @@
 #define VALID_PROB(prob1, prob2) ((prob1 >= 0.0) && (prob1 <= 1.0) && (prob2 >= 0.0) && (prob2 <= 1.0) && ((prob1 + prob2) == 1))
 
 /* Help string */
-#define HELP "Help for IMRC:\n===================================\n-W maximum x coordinates.\n-H maximum y coordinates.\n-R amount of recievers to spawn.\n-S amount of transmitters to spawn.\n-F file to read initial condition from.\n-O file for SNR output.\n-T number of threads to run.\n-G use graphics.\n-M model selection\n-D Die probability\n-N Spawn probability\n-I Iterations to run\n-h This message\n===================================\nINFO FOR GRAPHICS MODE:\nBLUE - BS.\n[RED..GREEN] - luser."
+#define HELP "Help for IMRC:\n===================================\n-W maximum x coordinates.\n-H maximum y coordinates.\n-R amount of recievers to spawn.\n-S amount of transmitters to spawn.\n-F file to read initial condition from.\n-O file for SNR output.\n-T number of threads to run.\n-G use graphics.\n-M model selection\n-D Die probability\n-N Spawn probability\n-I Iterations to run\n-h This message\n===================================\nINFO FOR GRAPHICS MODE:\nBLUE - BS.\n[RED..GREEN] - luser.\nCompiled at %s"
 
 #define VALID_ARGS "t:W:H:R:S:F:O:T:M:D:N:I:VBGh" /* Valid arguments for the shell */
 #define DEF_WIDTH 255 /* Default width of our silencing matrice */
@@ -156,7 +156,7 @@ int main(int argc, char *argv[]){
 	break;
       }
       case('h'):{
-        (void)puts(HELP);
+        (void)printf(HELP, __TIMESTAMP__);
 	return EXIT_SUCCESS;
       }
       default:{

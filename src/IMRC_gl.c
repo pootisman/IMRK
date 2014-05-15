@@ -5,6 +5,7 @@
 #include <math.h>
 #include "IMRC_gl.h"
 #include "IMRC_types.h"
+#include "IMRC_pretty_output.h"
 
 #define SNRMAX 160
 #define SNRADD 80
@@ -255,7 +256,7 @@ void render(void){
   CLRVCTR colorVect;
 
   if(!pSendersNow || !pRecieversNow || nRecieversNow == 0 || nSendersNow == 0){
-    (void)puts("Error, initialise model first!");
+    printe("Initialise model first!", __FILE__, __LINE__);
     return;
   }
 
@@ -373,7 +374,7 @@ void initGraphics(){
 
   glfwInit();
   if(!(pWView = glfwCreateWindow(640, 480, "IMRC", NULL, NULL))){
-    (void)puts("Error while initializing graphics!");
+    printe("While initializing graphics", __FILE__, __LINE__);
     glfwTerminate();
     return;
   }
@@ -385,20 +386,16 @@ void initGraphics(){
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
   glOrtho(0.0, maxWidthNow + 0.05*maxWidthNow, 0.0, maxHeightNow, -1.0, 1.0);
-#ifdef DEBUG
-  (void)puts("DEBUG: Graphics initialised.");
-#endif
+  printd("Graphics initialised", __FILE__, __LINE__);
 }
 
 void killWindow(void){
   if(!pWView){
-    (void)puts("Error, no window to stop.");
+    printe("No window to stop", __FILE__, __LINE__);
     return;
   }
 
   glfwDestroyWindow(pWView);
   glfwTerminate();
-#ifdef DEBUG
-  (void)puts("DEBUG: Stopped window.");
-#endif
+  printd("Stopped window", __FILE__, __LINE__);
 }

@@ -3,6 +3,7 @@
 #include <math.h>
 #define NOT_MAIN
 #include "IMRC_types.h"
+#include "IMRC_pretty_output.h"
 #include "IMRC_aux.h"
 
 extern float *gA, percentY, percentX, maxWidthNow, maxHeightNow;
@@ -15,18 +16,18 @@ extern SENDER *pSendersNow;
 SENDER *sndrAtIndex(unsigned int index){
   SENDER *pTempS = pSendersNow;
   
-  if(pTempS){
+  if(pTempS != NULL){
     for(;index > 0; index--){
-      if(pTempS){
+      if(pTempS != NULL){
         pTempS = pTempS->pNext;
       }else{
-        (void)puts("Error, index out of bounds");
+        printw("Index out of bounds", __FILE__, __LINE__);
         return NULL;
       }
     }
     return pTempS;
   }else{
-    (void)puts("Error, no senders in sndrAtIndex");
+    printe("Error, no senders in sndrAtIndex", __FILE__, __LINE__);
     return NULL;
   }
 }
@@ -35,18 +36,18 @@ SENDER *sndrAtIndex(unsigned int index){
 RECIEVER *rcvrAtIndex(unsigned int index){
   RECIEVER *pTempR = pRecieversNow;
 
-  if(pTempR){
+  if(pTempR != NULL){
     for(;index > 0; index--){
-      if(pTempR){
+      if(pTempR != NULL){
         pTempR = pTempR->pNext;
       }else{
-        (void)puts("Error, index out of bounds");
+        printw("Index out of bounds", __FILE__, __LINE__);
 	return NULL;
       }
     }
     return pTempR;
   }else{
-    (void)puts("Error, no recievers in rcvrAtIndex");
+    printe("No recievers in rcvrAtIndex", __FILE__, __LINE__);
     return NULL;
   }
 }
@@ -55,13 +56,13 @@ RECIEVER *rcvrAtIndex(unsigned int index){
 void bindToReciever(RECIEVER *pReciever, SENDER *pSender){
   RECIEVERS_LLIST *pTemp = NULL;
 
-  if(!pReciever || !pSender){
-    (void)puts("Error in bindToReciever, got NULL");
+  if(pReciever == NULL || pSender == NULL){
+    printe(ENULLPOINT, __FILE__, __LINE__);
     return;
   }
 
   if(pReciever->pOwner){
-    (void)puts("Error in bindToReciever, reciever already occupied.");
+    printw("Reciever already occupied", __FILE__, __LINE__);
     return;
   }
 
@@ -71,7 +72,7 @@ void bindToReciever(RECIEVER *pReciever, SENDER *pSender){
     pSender->pRecepients->pTarget = pReciever;
   }else{
     pTemp = pSender->pRecepients;
-    for(;pTemp->pNext; pTemp = pTemp->pNext);
+    for(;pTemp->pNext != NULL; pTemp = pTemp->pNext);
     pTemp->pNext = calloc(1, sizeof(RECIEVERS_LLIST));
     pTemp->pNext->pTarget = pReciever;
     pTemp->pNext->pPrev = pTemp;
@@ -89,11 +90,11 @@ void unbindReciever(RECIEVER *pReciever){
   unsigned int i = 0;
 
   if(!pTempS){
-    (void)puts("Error, failed to unbind from NULL");
+    printe("Failed to unbind from NULL", __FILE__, __LINE__);
     return;
   }
 
-  for(;pTempS; pTempS = pTempS->pNext){
+  for(;pTempS != NULL; pTempS = pTempS->pNext){
     pTempR = pTempS->pRecepients;
     for(i = 0; i < pTempS->nRecepients; i++){
       if(pTempR->pTarget == pReciever){
@@ -103,7 +104,7 @@ void unbindReciever(RECIEVER *pReciever){
 	}
 	
 	if(pTempR->pNext){
-	 pTempR->pNext->pPrev = pTempR->pPrev;
+	  pTempR->pNext->pPrev = pTempR->pPrev;
         }
         
         if(pTempR == pTempS->pRecepients){
@@ -124,19 +125,17 @@ void dumpToFile(FILE *output, unsigned int step){
   unsigned int i = 0;
   RECIEVER *pTempR = pRecieversNow;
 
-  if(!pRecieversNow || nRecieversNow == 0 || !output){
-    (void)puts("Error, failed to dump data to file.");
+  if(pRecieversNow == NULL || nRecieversNow == 0 || output == NULL){
+    printe("Failed to dump data to file", __FILE__, __LINE__);
     return;
   }
 
   (void)fprintf(output, "%d\n", step);
 
-  for(;pTempR; pTempR = pTempR->pNext, i++){
+  for(;pTempR != NULL; pTempR = pTempR->pNext, i++){
     (void)fprintf(output, "%d\t%f\t%f\t%f\n", i, pTempR->x,  pTempR->y, pTempR->SNRLin);
   }
-#ifdef DEBUG
-  (void)puts("DEBUG: Successfully written data to file.");
-#endif
+  printd("Successfully written data to file", __FILE__, __LINE__);
 }
 
 /* Read initial data from file */
@@ -145,13 +144,13 @@ void readFromFile(FILE *input){
   RECIEVER *pTempR = NULL;
   SENDER *pTempS = NULL;
 
-  if(!input){
-    (void)puts("Error, can't read from file.");
+  if(input == NULL){
+    printe("Can't read from file", __FILE__, __LINE__);
     return;
   }
 
-  if(!fscanf(input, "%u\n", &nRecieversNow)){
-    (void)puts("Error #1, can't read reciever data from file.");
+  if(fscanf(input, "%u\n", &nRecieversNow) == 0){
+    printe("Can't read reciever data from file", __FILE__, __LINE__);
     return;
   }
 
@@ -159,8 +158,8 @@ void readFromFile(FILE *input){
 
   pTempR->recalc = 1;
 
-  if(!fscanf(input, "%f\t%f\n", &(pTempR->x), &(pTempR->y))){
-    (void)puts("Error #2, can't read reciever data from file.");
+  if(fscanf(input, "%f\t%f\n", &(pTempR->x), &(pTempR->y)) == 0){
+    printe("Can't read reciever data from file", __FILE__, __LINE__);
     return;
   }
 
@@ -169,21 +168,21 @@ void readFromFile(FILE *input){
     pTempR->pNext->pPrev = pTempR;
     pTempR = pTempR->pNext;
     pTempR->recalc = 1;
-    if(!fscanf(input, "%f\t%f\n", &(pTempR->x), &(pTempR->y))){
-      (void)puts("Error #3, can't read reciever data from file.");
+    if(fscanf(input, "%f\t%f\n", &(pTempR->x), &(pTempR->y)) == 0){
+      printe("Can't read reciever data from file", __FILE__, __LINE__);
       return;
     }
   }
 
-  if(!fscanf(input, "%u\n", &nSendersNow)){
-    (void)puts("Error #1, can't read sender data from file.");
+  if(fscanf(input, "%u\n", &nSendersNow) == 0){
+    printe("Can't read sender data from file.", __FILE__, __LINE__);
     return;
   }
 
   pSendersNow = pTempS = calloc( 1, sizeof(SENDER));
 
-  if(!fscanf(input, "%f\t%f\t%f\t%u\t%f\n", &(pTempS->x), &(pTempS->y), &(pTempS->power), &bind, &(pTempS->freq))){
-    (void)puts("Error #2, can't read sender data from file.");
+  if(fscanf(input, "%f\t%f\t%f\t%u\t%f\n", &(pTempS->x), &(pTempS->y), &(pTempS->power), &bind, &(pTempS->freq)) == 0){
+    printe("Can't read sender data from file.", __FILE__, __LINE__);
     return;
   }
 
@@ -193,33 +192,31 @@ void readFromFile(FILE *input){
     pTempS->pNext = calloc(1, sizeof(SENDER));
     pTempS->pNext->pPrev = pTempS;
     pTempS = pTempS->pNext;
-    if(!fscanf(input, "%f\t%f\t%f\t%u\t%f\n", &(pTempS->x), &(pTempS->y), &(pTempS->power), &bind, &(pTempS->freq))){
-      (void)puts("Error #3, can't read sender data from file.");
+    if(fscanf(input, "%f\t%f\t%f\t%u\t%f\n", &(pTempS->x), &(pTempS->y), &(pTempS->power), &bind, &(pTempS->freq)) == 0){
+      printe("Can't read sender data from file.", __FILE__, __LINE__);
       return;
     }
     bindToReciever(rcvrAtIndex(bind), pTempS);
   }
 
-#ifdef DEBUG
-  (void)puts("DEBUG: Successfully read model data from file.");
-#endif
+  printd("Successfully read model data from file.", __FILE__, __LINE__);
 }
 
 /* Initialise random number generator */
 void initRand(void){
   FILE *I = fopen("/dev/urandom", "rb");
-  if(!I){
-    (void)puts("Error, no /dev/urandom?");
+  if(I == NULL){
+    printw("No /dev/urandom?", __FILE__, __LINE__);
     return;
   }
-  if(!fread(&randSeed, 1, sizeof(int), I)){
-    (void)puts("Error, failed to init generator.");
+  if(fread(&randSeed, 1, sizeof(int), I) == 0){
+    printw("Failed to init generator", __FILE__, __LINE__);
     return;
   }
   (void)srand(randSeed);
   (void)fclose(I);
 #ifdef DEBUG
-  (void)printf("DEBUG: Random number generator initialized, rand returned %d out of %d\n", rand(), RAND_MAX);
+  printd("Random number generator initialized", __FILE__, __LINE__);
 #endif
 }
 
@@ -228,12 +225,17 @@ RECIEVER *makeRcvrList(unsigned int nRecievers){
   unsigned int i = 0;
   RECIEVER *pTemp = NULL;
 
-  nRecieversNow = nRecievers;
+  if(nRecieversNow == 0){
+    nRecieversNow = nRecievers;
+  }else{
+    printw("WARNING: Not creating new list of recievers over existing", __FILE__, __LINE__);
+    return NULL;
+  }
 
   if(nRecievers != 0){
     pTemp = pRecieversNow = calloc(1, sizeof(RECIEVER));
-    if(!pRecieversNow){
-      (void)puts("Error allocating memory for new reciever");
+    if(pRecieversNow == NULL){
+      printe("Failed to allocate memory for new reciever", __FILE__, __LINE__);
       return NULL;
     }
   }else{
@@ -244,8 +246,8 @@ RECIEVER *makeRcvrList(unsigned int nRecievers){
 
   for(i = 1; i < nRecieversNow; i++){
     pTemp->pNext = calloc(1, sizeof(RECIEVER));
-    if(!pTemp->pNext){
-      (void)puts("Error allocating memory for new reciever");
+    if(pTemp->pNext == NULL){
+      printe("Failed to allocate memory for new reciever", __FILE__, __LINE__);
       return NULL;
     }
     pTemp->pNext->pPrev = pTemp;
@@ -253,9 +255,9 @@ RECIEVER *makeRcvrList(unsigned int nRecievers){
     pTemp->recalc = 1;
   }
 
-#ifdef DEBUG
-  (void)puts("DEBUG: Prepared linked list for recievers.");
-#endif
+  pTemp->pNext = NULL;
+
+  printd("Created a list for recievers", __FILE__, __LINE__);
 
   return pRecieversNow;
 }
@@ -265,12 +267,17 @@ SENDER *makeSndrList(unsigned int nSenders){
   unsigned int i = 0;
   SENDER *pTemp = NULL;
 
-  nSendersNow = nSenders;
+  if(nSendersNow == 0){
+    nSendersNow = nSenders;
+  }else{
+    printw("Not creating new list of recievers over existing", __FILE__, __LINE__);
+    return NULL;
+  }
 
   if(nSenders != 0){
     pTemp = pSendersNow = calloc(1, sizeof(SENDER));
-    if(!pSendersNow){
-      (void)puts("Error allocating memory for new sender");
+    if(pSendersNow == NULL){
+      printe("Failed to allocate memory for new sender", __FILE__, __LINE__);
       return NULL;
     }
   }else{
@@ -279,17 +286,17 @@ SENDER *makeSndrList(unsigned int nSenders){
 
   for(i = 1; i < nSendersNow; i++){
     pTemp->pNext = calloc(1, sizeof(SENDER));
-    if(!pTemp->pNext){
-      (void)puts("Error allocating memory for new sender");
+    if(pTemp->pNext == NULL){
+      printe("Failed to allocate memory for new sender", __FILE__, __LINE__);
       return NULL;
     }
     pTemp->pNext->pPrev = pTemp;
     pTemp = pTemp->pNext;
   }
 
-#ifdef DEBUG
-  (void)puts("DEBUG: Prepared linked list for transmitters.");
-#endif
+  pTemp->pNext = NULL;
+
+  printd("Prepared linked list for transmitters", __FILE__, __LINE__);
 
   return pSendersNow;
 }
@@ -299,7 +306,7 @@ void freeLists(void){
   SENDER *pTempS = NULL, *pTempS2 = NULL;
   RECIEVER *pTempR = NULL, *pTempR2 = NULL;
 
-  if(pSendersNow){
+  if(pSendersNow != NULL){
     pTempS = pSendersNow;
     pTempS2 = pTempS->pNext;
     (void)free(pTempS);
@@ -311,7 +318,7 @@ void freeLists(void){
     pSendersNow = NULL;
   }
   
-  if(pRecieversNow){
+  if(pRecieversNow != NULL){
     pTempR = pRecieversNow;
     pTempR2 = pTempR->pNext;
     (void)free(pTempR);
@@ -323,18 +330,15 @@ void freeLists(void){
     pRecieversNow = NULL;
   }
 
-#ifdef DEBUG
-  (void)puts("DEBUG: All linked lists freed.");
-#endif
-
+  printd("All linked lists freed", __FILE__, __LINE__);
 }
 
 /* Add a new reciever to the list */
 void addReciever(SENDER *pSender, unsigned int x, unsigned int y){
   RECIEVER *pTemp = pRecieversNow;
 
-  if(!pTemp){
-    (void)puts("Failed to link to NULL.");
+  if(pTemp == NULL){
+    printe("Failed to link to NULL.", __FILE__, __LINE__);
     return;
   }
 
@@ -346,6 +350,7 @@ void addReciever(SENDER *pSender, unsigned int x, unsigned int y){
 
   pTemp->pNext->x = x;
   pTemp->pNext->y = y;
+  pTemp->pNext->pNext = NULL;
 
   nRecieversNow++;
 
@@ -359,12 +364,13 @@ void addReciever(SENDER *pSender, unsigned int x, unsigned int y){
 
   }
 
+  pTemp->pNext->pNext = NULL;
 }
 
 /* Remove the reciever from the list */
 void rmReciever(RECIEVER *pReciever){
-  if(!pReciever || !pRecieversNow){
-    (void)puts("Error, got NULL in rmReciever()");
+  if(pReciever == NULL || pRecieversNow == NULL){
+    printe("Got NULL in rmReciever()", __FILE__, __LINE__);
     return;
   }
 
@@ -372,15 +378,15 @@ void rmReciever(RECIEVER *pReciever){
     pRecieversNow = pRecieversNow->pNext;
   }
 
-  if(pReciever->pPrev){
+  if(pReciever->pPrev != NULL){
     pReciever->pPrev->pNext = pReciever->pNext;
   }
   
-  if(pReciever->pNext){
+  if(pReciever->pNext != NULL){
     pReciever->pNext->pPrev = pReciever->pPrev;
   }
 
-  if(pSendersNow){
+  if(pSendersNow != NULL){
     unbindReciever(pReciever);
   }
   
@@ -395,13 +401,13 @@ SENDER *getNearest(RECIEVER *pReciever){
   float minDist = sqrt(maxWidthNow*maxWidthNow + maxHeightNow*maxHeightNow), dist = 0.0;
   SENDER *pTempS = pSendersNow, *pSelection = NULL;
 
-  if(!pReciever){
-    (void)puts("Error, no reciever specified.");
+  if(pReciever == NULL){
+    printe("No reciever specified", __FILE__, __LINE__);
     return NULL;
   }
 
-  if(!pRecieversNow || !pSendersNow){
-    (void)puts("Error, model not initialized.");
+  if(pRecieversNow == NULL || pSendersNow == NULL){
+    printe("Model not initialized", __FILE__, __LINE__);
     return NULL;
   }
 
