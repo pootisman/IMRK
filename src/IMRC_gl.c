@@ -42,7 +42,7 @@ inline void drawNumber(unsigned char digit, float x, float y){
   unsigned int i = 0;
 
   if(digit > 10 || digit < 0){
-    (void)printf("Digit %d too big, ignoring.\n", digit);
+    (void)printd("Digit too big, ignoring.\n", __FILE__, __LINE__);
     return;
   }
 
@@ -144,11 +144,9 @@ void drawDigit(unsigned char digit, float x, float y){
   unsigned int i = 0;
 
   if(digit > 10 || digit < 0){
-    (void)printf("Digit %d too big, ignoring.\n", digit);
+    (void)printd("Digit too big, ignoring.\n", __FILE__, __LINE__);
     return;
   }
-
-  (void)printf("DEBUG: Drawing number %d at %f, %f.\n", digit, x, y);
 
   glBegin(GL_LINES);
   while(1){
@@ -237,8 +235,6 @@ CLRVCTR calcColor(float dB){
   result.R = Rs;
   result.G = Gs;
   result.B = Bs;
-
-  (void)printf("Signal %f with color [%f, %f, %f]\n", dB, Rs, Gs, Bs);
 
   return result;
 }

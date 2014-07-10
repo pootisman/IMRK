@@ -6,11 +6,11 @@ DBG_SUP=-O0 -g -p
 
 LDFLAGS=-lglfw -lGL -lm -pthread -lgslcblas -lgsl
 
-IMRC_BIN_DEP=.tmp/IMRC_models.o .tmp/IMRC_aux.o .tmp/IMRC_ver.o .tmp/IMRC_gl.o .tmp/IMRC_pretty_output.o src/IMRC_main.c
+IMRC_BIN_DEP=.tmp/IMRC_models.o .tmp/IMRC_aux.o .tmp/IMRC_ver.o .tmp/IMRC_gl.o .tmp/IMRC_pretty_output.o .tmp/IMRC_ploss_models.o .tmp/IMRC_rand_gen.o src/IMRC_main.c
 
-IMRC_DBG_DEP=.tmp/IMRC_models_dbg.o .tmp/IMRC_aux_dbg.o .tmp/IMRC_ver_dbg.o .tmp/IMRC_gl_dbg.o .tmp/IMRC_pretty_output_dbg.o src/IMRC_main.c
+IMRC_DBG_DEP=.tmp/IMRC_models_dbg.o .tmp/IMRC_aux_dbg.o .tmp/IMRC_ver_dbg.o .tmp/IMRC_gl_dbg.o .tmp/IMRC_pretty_output_dbg.o .tmp/IMRC_ploss_models_dbg.o .tmp/IMRC_rand_gen_dbg.o src/IMRC_main.c
 
-IMRC_DEP=src/IMRC_main.c src/IMRC_models.c src/IMRC_aux.c src/IMRC_aux.h src/IMRC_ver.h src/IMRC_ver.c src/IMRC_gl.c src/IMRC_gl.h src/IMRC_models.h src/IMRC_types.h src/IMRC_pretty_output.h
+IMRC_DEP=src/IMRC_main.c src/IMRC_models.c src/IMRC_aux.c src/IMRC_aux.h src/IMRC_ver.h src/IMRC_ver.c src/IMRC_gl.c src/IMRC_ploss_models.h src/IMRC_gl.h src/IMRC_models.h src/IMRC_types.h src/IMRC_rand_gen.h src/IMRC_pretty_output.h
 
 all: release debug testtools
 
@@ -26,6 +26,8 @@ release: ${IRMC_DEP}
 	gcc $(CFLAGS) $(OPT_SUP) -c src/IMRC_ver.c -o .tmp/IMRC_ver.o
 	gcc $(CFLAGS) $(OPT_SUP) -c src/IMRC_aux.c -o .tmp/IMRC_aux.o
 	gcc $(CFLAGS) $(OPT_SUP) -c src/IMRC_models.c -o .tmp/IMRC_models.o
+	gcc $(CFLAGS) $(OPT_SUP) -c src/IMRC_ploss_models.c -o .tmp/IMRC_ploss_models.o
+	gcc $(CFLAGS) $(OPT_SUP) -c src/IMRC_rand_gen.c -o .tmp/IMRC_rand_gen.o
 	gcc $(CFLAGS) $(OPT_SUP) ${IMRC_BIN_DEP} $(LDFLAGS) -o bin/IMRC
 debug: ${IRMC_DEP} 
 	./prep.sh
@@ -35,6 +37,8 @@ debug: ${IRMC_DEP}
 	gcc -DDEBUG $(CFLAGS) $(DBG_SUP) -c src/IMRC_ver.c -o .tmp/IMRC_ver_dbg.o
 	gcc -DDEBUG $(CFLAGS) $(DBG_SUP) -c src/IMRC_aux.c -o .tmp/IMRC_aux_dbg.o
 	gcc -DDEBUG $(CFLAGS) $(DBG_SUP) -c src/IMRC_models.c -o .tmp/IMRC_models_dbg.o
+	gcc -DDEBUG $(CFLAGS) $(DBG_SUP) -c src/IMRC_rand_gen.c -o .tmp/IMRC_rand_gen_dbg.o
+	gcc -DDEBUG $(CFLAGS) $(DBG_SUP) -c src/IMRC_ploss_models.c -o .tmp/IMRC_ploss_models_dbg.o
 	gcc -DDEBUG $(CFLAGS) $(DBG_SUP) ${IMRC_DBG_DEP} $(LDFLAGS) -o bin/IMRC_dbg
 clean:
 	rm -rfv .tmp

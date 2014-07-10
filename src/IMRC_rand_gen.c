@@ -37,3 +37,11 @@ float genGauss(void){
   
   return sqrt(-1.0f * log(S) / S) * V1;
 }
+
+/* Exponential distribution generator, Box-Muller method */
+#ifndef DEBUG
+inline
+#endif
+float genExp(void){
+  return -log((float)rand()/(float)RAND_MAX);
+}
