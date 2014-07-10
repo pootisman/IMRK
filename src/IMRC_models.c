@@ -89,7 +89,8 @@ void contThreads(void){
   printd("Continuing threads", __FILE__, __LINE__);
 
   for(i = 0; i < nThreadsNow; i++){
-    while(pThreadSigRcv0 == 0){
+    *(pThreadSigRcv2 + i) = 0;
+    while(*(pThreadSigRcv2 + i) == 0){
       (void)pthread_cond_signal(pMainReadyConditions + i);
     }
   }
