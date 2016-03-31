@@ -369,7 +369,7 @@ void initGraphics(){
   percentY = maxHeightNow/100.0;
 
   glfwInit();
-  if(!(pWView = glfwCreateWindow(640, 480, "IMRC", NULL, NULL))){
+  if(!(pWView = glfwCreateWindow(1024, 768, "IMRC", NULL, NULL))){
     printe("While initializing graphics", __FILE__, __LINE__);
     glfwTerminate();
     return;
@@ -382,6 +382,7 @@ void initGraphics(){
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
   glOrtho(0.0, maxWidthNow + 0.05*maxWidthNow, 0.0, maxHeightNow, -1.0, 1.0);
+  glEnable(GL_LINE_SMOOTH);
   printd("Graphics initialised", __FILE__, __LINE__);
 }
 

@@ -8,10 +8,6 @@
 #include "IMRC_aux.h"
 #include "IMRC_ver.h"
 
-#ifdef DEBUG
-#include <mcheck.h>
-#endif
-
 /* Macros, Gaaaah! */
 #define VALID_PROB(prob1, prob2) ((prob1 >= 0.0) && (prob1 <= 1.0) && (prob2 >= 0.0) && (prob2 <= 1.0) && ((prob1 + prob2) == 1))
 
@@ -36,9 +32,6 @@ int main(int argc, char *argv[]){
   FILE *I = NULL, *O = NULL;
   float probSpawn = DEF_PROB_NEW, probDie = DEF_PROB_DIE;
   unsigned short modeset = NEAR;
-#ifdef DEBUG
-  mtrace();
-#endif
 
   /* Parse program arguments. */
   while((opt = getopt(argc, argv, VALID_ARGS)) != -1){

@@ -36,20 +36,14 @@ SENDER *sndrAtIndex(unsigned int index){
 RECIEVER *rcvrAtIndex(unsigned int index){
   RECIEVER *pTempR = pRecieversNow;
 
-  if(pTempR != NULL){
-    for(;index > 0; index--){
-      if(pTempR != NULL){
-        pTempR = pTempR->pNext;
-      }else{
-        printw("Index out of bounds", __FILE__, __LINE__);
-	return NULL;
-      }
-    }
-    return pTempR;
-  }else{
-    printe("No recievers in rcvrAtIndex", __FILE__, __LINE__);
-    return NULL;
+  while(pTempR != NULL && index > 0){
+    pTempR = pTempR->pNext;
+    --index;
   }
+
+  if(pTempR == NULL){printw("Index out pf bounds", __FILE__, __LINE__);}
+
+  return pTempR;
 }
 
 /* Bind transmitter to specific reciever */

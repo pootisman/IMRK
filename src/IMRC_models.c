@@ -31,21 +31,23 @@ typedef struct{
 }THREAD_PARAMS;
 
 /* Global model parameters */
-unsigned char startedListen = 0, *pThreadExited = NULL, *pThreadSigRcv0 = NULL, *pThreadSigRcv1 = NULL, *pThreadSigRcv2 = NULL;
+unsigned char startedListen = 0, *pThreadExited = NULL;
 unsigned int shutdown = 0, firstRun = 1;/* Running for the first time, should we stop now?  */
-pthread_mutex_t pStartThread = PTHREAD_MUTEX_INITIALIZER; /* Mutex for starting thread. */
 
-pthread_mutex_t *pThreadBeginMutexes = NULL;
-pthread_mutex_t *pThreadFinishedMutexes = NULL;
-pthread_mutex_t *pMainReadyMutexes = NULL;
-pthread_cond_t *pThreadBeginConditions = NULL; /* Condition variable for starting child threads. */
-pthread_cond_t *pThreadFinishedConditions = NULL; /* Condition for thread to continue. */
-pthread_cond_t *pMainReadyConditions = NULL; /* Condition if thread finished calculations, used by parent. */
-pthread_t *pThreads = NULL;
-THREAD_PARAMS *pParams = NULL; /* Thread parameters, change drastically during run. */
+pthread_mutexattr_t mutexAttrRobust; /* Robust mutex attribute */ 
+
+pthread_mutex_t *pThreadBeginMutexes = NULL; /* We are the start of the threaded function,
+						try to lock mutex in slave thread, main thread unlocks all of the mutexes,
+						then locks after the slave thread stopped */
+pthread_mutex_t *pMainReadyMutexes = NULL; /* We are in the slave thread, trying to lock mutex, but
+					      master thread locked it. Master must unlock it after it is done */ 
+pthread_t *pThreads = NULL; /* Used to store thread data, only slave threads */
+
+THREAD_PARAMS *pParams = NULL; /* Thread parameters, change contents. */
 
 /* Declare the function before actual use to prevent blahblah undeclared errors */
 void *threadPowerCalc(void *args);
+void waitForThreads(void);
 
 /* Prepare threads for further use and keep them up all the time */
 #ifndef DEBUG
@@ -60,18 +62,10 @@ void initThreads(unsigned int nThrds){
     pThreads = calloc(nThrds, sizeof(pthread_t));
     pParams = calloc(nThrds, sizeof(THREAD_PARAMS));
 
-    pThreadBeginConditions = calloc(nThrds, sizeof(pthread_cond_t));
-    pThreadFinishedConditions = calloc(nThrds, sizeof(pthread_cond_t));
-    pMainReadyConditions = calloc(nThrds, sizeof(pthread_cond_t));
-
     pThreadBeginMutexes = calloc(nThrds, sizeof(pthread_mutex_t));
-    pThreadFinishedMutexes = calloc(nThrds, sizeof(pthread_mutex_t));
     pMainReadyMutexes = calloc(nThrds, sizeof(pthread_mutex_t));
     
     pThreadExited = calloc(nThrds, sizeof(unsigned char));
-    pThreadSigRcv0 = calloc(nThrds, sizeof(unsigned char));
-    pThreadSigRcv1 = calloc(nThrds, sizeof(unsigned char));
-    pThreadSigRcv2 = calloc(nThrds, sizeof(unsigned char));
 
     nThreadsNow = nThrds;
   }else{
@@ -79,28 +73,11 @@ void initThreads(unsigned int nThrds){
   }
 }
 
-/* Continue all threads, initially they will be locked. */
-#ifndef DEBUG
-inline
-#endif
-void contThreads(void){
-  unsigned int i = 0;
-
-  printd("Continuing threads", __FILE__, __LINE__);
-
-  for(i = 0; i < nThreadsNow; i++){
-    *(pThreadSigRcv2 + i) = 0;
-    while(*(pThreadSigRcv2 + i) == 0){
-      (void)pthread_cond_signal(pMainReadyConditions + i);
-    }
-  }
-}
-
 /* Start all threads, call this ONCE. */
 #ifndef DEBUG
 inline
 #endif
-void startThreads(void){
+void startThreads(void *threadFunc(void *)){
   unsigned char i = 0;
 
   if(firstRun == 0){
@@ -114,19 +91,15 @@ void startThreads(void){
     return;
   }
 
+  (void)pthread_mutexattr_init(&mutexAttrRobust);
+  (void)pthread_mutexattr_setrobust(&mutexAttrRobust, PTHREAD_MUTEX_ROBUST);
+
   for(i = 0; i < nThreadsNow; i++){
-    (void)pthread_cond_init(pThreadFinishedConditions + i, NULL);
-    (void)pthread_cond_init(pThreadBeginConditions + i, NULL);
-    (void)pthread_cond_init(pMainReadyConditions + i, NULL);
-    (void)pthread_mutex_init(pThreadFinishedMutexes + i, NULL);
-    (void)pthread_mutex_init(pThreadBeginMutexes + i, NULL);
-    (void)pthread_mutex_init(pMainReadyMutexes + i, NULL);
+    (void)pthread_mutex_init(pThreadBeginMutexes + i, &mutexAttrRobust);
+    (void)pthread_mutex_init(pMainReadyMutexes + i, &mutexAttrRobust);
     (pParams + i)->threadNum = i;
     *(pThreadExited + i) = 0;
-    *(pThreadSigRcv0 + i) = 0;
-    *(pThreadSigRcv1 + i) = 0;
-    *(pThreadSigRcv2 + i) = 0;
-    if(pthread_create(pThreads + i, NULL, threadPowerCalc, pParams + i) != 0){
+    if(pthread_create(pThreads + i, NULL, threadFunc, pParams + i) != 0){
       printw("Failed to create thread, retrying", __FILE__, __LINE__);
       i--;
     }
@@ -168,26 +141,16 @@ void freeThreads(void){
 
   shutdown = 1;
 
-  (void)contThreads();
-
   for(i = 0; i < nThreadsNow; i++){
     if(*(pThreadExited + i)){
       (void)pthread_join(*(pThreads + i), NULL);
+      (void)pthread_mutex_destroy(pThreadBeginMutexes + i);
+      (void)pthread_mutex_destroy(pMainReadyMutexes + i);
     }
   }
 
-  (void)free(pThreadSigRcv0);
-  (void)free(pThreadSigRcv1);
-  (void)free(pThreadSigRcv2);
-  (void)free(pThreadExited);
-
-  (void)free(pThreadFinishedMutexes);
   (void)free(pThreadBeginMutexes);
   (void)free(pMainReadyMutexes);
-  
-  (void)free(pThreadFinishedConditions);
-  (void)free(pThreadBeginConditions);
-  (void)free(pMainReadyConditions);
 
   (void)free(pThreads);
   (void)free(pParams);
@@ -206,17 +169,13 @@ void waitForThreads(){
 
   /* Inform threads that we are ready to wait. */
   for(i = 0; i < nThreadsNow; i++){
-    *(pThreadSigRcv0 + i) = 0;
-    while(*(pThreadSigRcv0 + i) == 0){
-      (void)pthread_cond_signal(pThreadBeginConditions + i);
-    }
+    (void)pthread_mutex_lock(pMainReadyMutexes + i);
+    (void)pthread_mutex_unlock(pThreadBeginMutexes + i);
   }
 
   for(i = 0; i < nThreadsNow; i++){
-    (void)pthread_mutex_lock(pThreadFinishedMutexes + i);
-    (void)pthread_cond_wait(pThreadFinishedConditions + i, pThreadFinishedMutexes + i);
-    *(pThreadSigRcv1 + i) = 1;
-    (void)pthread_mutex_unlock(pThreadFinishedMutexes + i);
+    (void)pthread_mutex_lock(pThreadBeginMutexes + i);
+    (void)pthread_mutex_unlock(pMainReadyMutexes + i);
     printd("Parent thread notified", __FILE__, __LINE__);
   }
 
@@ -247,8 +206,8 @@ char isInView(SENDER *pOrigin, float startDegs, float stopDegs, RECIEVER *pUser)
   return 0;
 }
 
-/* Function for threaded calculations */
-void *threadPowerCalc(void *args){
+/* Function for threaded calculations, no raytracing */
+void *threadPowerCalcSPL(void *args){
   THREAD_PARAMS *task = NULL;
   unsigned int i = 0, j = 0;
   float buffer = 0.0;
@@ -266,10 +225,6 @@ void *threadPowerCalc(void *args){
 
     printdt("Thread waiting for start signal", __FILE__, __LINE__, task->threadNum);
     (void)pthread_mutex_lock(pThreadBeginMutexes + task->threadNum);
-    (void)pthread_cond_wait(pThreadBeginConditions + task->threadNum, pThreadBeginMutexes + task->threadNum);
-    *(pThreadSigRcv0 + task->threadNum) = 1;
-    (void)pthread_mutex_unlock(pThreadBeginMutexes + task->threadNum);
-
     printdt("Thread recieved start signal", __FILE__, __LINE__, task->threadNum);
     pReciever = rcvrAtIndex(task->threadNum);
     for(i = 0; i < task->steps && pReciever != NULL; i++){
@@ -318,18 +273,12 @@ void *threadPowerCalc(void *args){
     }
 
     printdt("Thread finished calculations, notifying parent", __FILE__, __LINE__, task->threadNum);
-    *(pThreadSigRcv1 + task->threadNum) = 0;
-    while(*(pThreadSigRcv1 + task->threadNum) == 0){
-      (void)pthread_cond_signal(pThreadFinishedConditions + task->threadNum);
-    }
-    
+    (void)pthread_mutex_unlock(pThreadBeginMutexes + task->threadNum);
+
     printdt("Waiting for parent to finish it's job", __FILE__, __LINE__, task->threadNum);
     (void)pthread_mutex_lock(pMainReadyMutexes + task->threadNum);
-    (void)pthread_cond_wait(pMainReadyConditions + task->threadNum, pMainReadyMutexes + task->threadNum);
-    *(pThreadSigRcv2 + task->threadNum) = 1;
-    (void)pthread_mutex_unlock(pMainReadyMutexes + task->threadNum);
-
     printdt("Parent finished, continuing", __FILE__, __LINE__, task->threadNum);
+    (void)pthread_mutex_unlock(pMainReadyMutexes + task->threadNum);
   }
 
   *(pThreadExited + task->threadNum) = 1;
@@ -365,12 +314,9 @@ void calcPower(void){
   }
   
   /* Start all threads */
-  if(firstRun == 1){
-    startThreads();
-  }else{
-    contThreads();
-  }
+  startThreads(&threadPowerCalcSPL);
 
+  /* Wait for threads to finish their job */
   waitForThreads();
 
   for(i = 0; i < nRecieversNow; i++){
@@ -457,8 +403,6 @@ void modelLoop(FILE *O, unsigned int steps, unsigned int nanoDelay){
     }
 
     calcPower();
-    (void)printf("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$[STEP: %d]\n", step);
-    (void)fflush(stdout);
     if(O && steps > 0){
       dumpToFile(O, step);
     }
